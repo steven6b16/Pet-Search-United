@@ -1,0 +1,84 @@
+.App {
+  text-align: center;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.App {
+  text-align: center; /* 文字置中 */
+  margin: 20px; /* 外邊距，讓內容離邊遠點 */
+}
+
+form {
+  display: flex; /* 讓表單內容直排 */
+  flex-direction: column; /* 直排方向 */
+  gap: 10px; /* 每個輸入框之間有空隙 */
+  max-width: 300px; /* 表單寬度限制 */
+  margin: auto; /* 置中 */
+}
+
+button {
+  padding: 10px; /* 按鈕內空間 */
+  background-color: #4CAF50; /* 綠色 */
+  color: white; /* 白字 */
+  border: none; /* 無邊框 */
+}
+.App {
+  text-align: center;
+  margin: 20px;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 300px;
+  margin: auto;
+}
+
+button {
+  padding: 10px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+}
+
+.pet-card {
+  border: 1px solid #ccc; /* 卡片有框 */
+  padding: 10px;
+  margin: 10px auto;
+  max-width: 300px;
+}
