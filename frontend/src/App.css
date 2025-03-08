@@ -4,7 +4,6 @@
   padding: 20px;
   font-family: Arial, sans-serif;
 }
-
 .app-header {
   text-align: center;
   margin-bottom: 40px;
@@ -19,7 +18,6 @@
   font-size: 1.2em;
   color: #666;
 }
-
 .report-button {
   display: inline-block;
   padding: 10px 20px;
@@ -44,37 +42,11 @@
   padding: 8px;
   width: 300px;
   margin-right: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
 }
 
 .category-select {
   padding: 8px;
   border: 1px solid #ccc;
-  border-radius: 4px;
-}
-
-.pet-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
-  margin-bottom: 40px;
-}
-
-.pet-card {
-  display: flex;
-  border: 1px solid #ddd;
-  padding: 10px;
-  border-radius: 5px;
-  background-color: #fff;
-}
-
-.pet-image {
-  margin-right: 10px;
-  width: 100px;
-  height: 100px;
-  object-fit: cover;
-  border-radius: 5px;
 }
 
 .pet-info p {
@@ -85,4 +57,3 @@
   height: 400px;
   width: 100%;
 }
-

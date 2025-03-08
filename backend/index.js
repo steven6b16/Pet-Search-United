@@ -12,6 +12,9 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// 靜態文件服務，用於訪問上傳嘅照片
+app.use('/uploads', express.static('uploads'));
+
 const db = new sqlite3.Database('lostpet.db', (err) => {
   if (err) {
     console.error('數據庫連接失敗：', err.message);
@@ -73,6 +76,14 @@ app.post('/api/report-lost', upload.single('photo'), (req, res) => {
   const lngNum = parseFloat(lng);
   if (isNaN(latNum) || isNaN(lngNum)) {
     return res.status(400).json({ error: '經緯度格式錯誤！' });
+  }
+
+  if (contact && !/^(\d{8,}|\S+@\S+\.\S+)$/.test(contact)) {
+    return res.status(400).json({ error: '聯繫方式應為有效電話或郵箱！' });
+  }
+
+  if (lost_date && isNaN(Date.parse(lost_date))) {
+    return res.status(400).json({ error: '走失日期格式錯誤！' });
   }
 
   db.run(

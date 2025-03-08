@@ -104,7 +104,6 @@ function ReportLost() {
         data.append(key, formData[key]);
       }
     });
-    // 提交時使用完整地址
     data.set('location', formData.fullLocation);
 
     try {
