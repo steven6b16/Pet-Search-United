@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -47,7 +47,7 @@ async function reverseGeocode(lat, lng) {
     const fullAddress = response.data.display_name || '未知地址';
     const addressParts = fullAddress.split(', ').filter(part => part.trim());
     const simplifiedAddress = addressParts.length >= 2
-      ? `${addressParts[addressParts.length - 4]} ${addressParts[0]}` // 提取區名同主要地點
+      ? `${addressParts[addressParts.length - 4]} ${addressParts[0]}`
       : fullAddress;
     return { fullAddress, simplifiedAddress };
   } catch (error) {
@@ -56,15 +56,15 @@ async function reverseGeocode(lat, lng) {
   }
 }
 
-function ReportLost() {
+function ReportLost(props) {
   const [formData, setFormData] = useState({
     name: '',
     breed: '',
     color: '',
     lat: '',
     lng: '',
-    location: '', // 用於顯示簡化地址
-    fullLocation: '', // 用於儲存完整地址
+    location: '',
+    fullLocation: '',
     species: '狗',
     gender: '未知',
     age: '',
@@ -94,8 +94,50 @@ function ReportLost() {
     }));
   };
 
+  const handleGetCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          handleMapUpdate({ lat: latitude, lng: longitude }, null);
+          reverseGeocode(latitude, longitude).then(({ fullAddress, simplifiedAddress }) => {
+            handleMapUpdate({ lat: latitude, lng: longitude }, fullAddress, simplifiedAddress);
+          });
+        },
+        (err) => {
+          setError('無法獲取當前位置，請手動點選地圖！');
+          console.error('獲取位置失敗：', err);
+        }
+      );
+    } else {
+      setError('瀏覽器不支持定位功能，請手動點選地圖！');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!formData.name) {
+      setError('名稱為必填！');
+      setMessage('');
+      return;
+    }
+    if (!formData.lat || !formData.lng) {
+      setError('請喺地圖上選擇地點！');
+      setMessage('');
+      return;
+    }
+    if (formData.contact && !/^(\d{8,}|\S+@\S+\.\S+)$/.test(formData.contact)) {
+      setError('聯繫方式應為有效電話或郵箱！');
+      setMessage('');
+      return;
+    }
+    if (formData.lost_date && isNaN(Date.parse(formData.lost_date))) {
+      setError('走失日期格式錯誤！');
+      setMessage('');
+      return;
+    }
+
     const data = new FormData();
     Object.keys(formData).forEach(key => {
       if (key === 'photo' && formData[key]) {
@@ -127,6 +169,9 @@ function ReportLost() {
         lost_date: '',
         photo: null,
       });
+      if (props.onReportSuccess) {
+        props.onReportSuccess();
+      }
     } catch (err) {
       setError(err.response?.data?.error || '提交失敗！');
       setMessage('');
@@ -191,6 +236,7 @@ function ReportLost() {
           <div>
             <label>地點：</label>
             <input type="text" name="location" value={formData.location} readOnly />
+            <button type="button" onClick={handleGetCurrentLocation}>使用當前位置</button>
             <MapContainer center={[22.3193, 114.1694]} zoom={11} style={{ height: '400px', width: '100%', marginTop: '10px' }}>
               <TileLayer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

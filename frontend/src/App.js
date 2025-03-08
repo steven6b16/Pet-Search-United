@@ -17,7 +17,6 @@ const defaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = defaultIcon;
 
-// 簡化地址函數
 function simplifyAddress(fullAddress) {
   if (!fullAddress) return '未知地址';
   const addressParts = fullAddress.split(', ').filter(part => part.trim());
@@ -33,30 +32,32 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
+  const fetchPets = async () => {
     console.log('開始請求數據...');
     setLoading(true);
-    axios.get('http://localhost:5000/api/lost-pets', {
-      headers: { 'Content-Type': 'application/json' },
-      withCredentials: false,
-    })
-      .then(response => {
-        console.log('獲取數據：', response.data);
-        setLostPets(response.data || []);
-        setLoading(false);
-      })
-      .catch(error => {
-        console.error('拿資料失敗：', error.message);
-        setError(error.message);
-        setLoading(false);
+    try {
+      const response = await axios.get('http://localhost:5000/api/lost-pets', {
+        headers: { 'Content-Type': 'application/json' },
+        withCredentials: false,
       });
+      setLostPets(response.data || []);
+      setLoading(false);
+    } catch (error) {
+      console.error('拿資料失敗：', error.message);
+      setError(error.message);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPets();
   }, []);
 
   const filteredPets = lostPets.filter(pet => {
     const searchLower = searchTerm.toLowerCase();
     const matchSearch = (
       (pet.name ? pet.name.toLowerCase() : '').includes(searchLower) ||
-      (pet.location ? pet.location.toLowerCase() : '').includes(searchLower) // 搜尋完整地址
+      (pet.location ? pet.location.toLowerCase() : '').includes(searchLower)
     );
     const matchCategory = category === 'all' ||
       (category === 'cat' && (pet.species === '貓' || !pet.species)) ||
@@ -116,8 +117,8 @@ function App() {
                       <div className="pet-info">
                         <p><strong>名稱：</strong>{pet.name || '未知'}</p>
                         <p><strong>物種：</strong>{pet.species || '未知'}</p>
+                        <p><strong>走失日期：</strong>{pet.lost_date || '未知'}</p>
                         <p><strong>地點：</strong>{simplifyAddress(pet.location)}</p>
-                        <p><strong>提交時間：</strong>{pet.created_at}</p>
                       </div>
                     </div>
                   ))
@@ -138,8 +139,8 @@ function App() {
                         <div>
                           <strong>名稱：</strong>{pet.name || '未知'}<br />
                           <strong>物種：</strong>{pet.species || '未知'}<br />
+                          <strong>走失日期：</strong>{pet.lost_date || '未知'}<br />
                           <strong>地點：</strong>{simplifyAddress(pet.location)}<br />
-                          <strong>提交時間：</strong>{pet.created_at}<br />
                           {pet.photo && <img src={`http://localhost:5000/${pet.photo}`} alt={pet.name} width="100" />}
                         </div>
                       </Popup>
@@ -148,7 +149,7 @@ function App() {
               </MapContainer>
             </>
           } />
-          <Route path="/report-lost" element={<ReportLost />} />
+          <Route path="/report-lost" element={<ReportLost onReportSuccess={fetchPets} />} />
         </Routes>
       </div>
     </Router>
