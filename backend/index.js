@@ -20,19 +20,35 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 app.post('/api/report-lost', upload.single('photo'), async (req, res) => {
-  const { name, breed, color, lat, lng } = req.body;
+  console.log('收到數據：', req.body);
+  console.log('收到文件：', req.file);
+
+  const { name, breed, color, lat, lng, species } = req.body;
   const photo = req.file ? req.file.path.replace(/\\/g, '/') : null;
 
-  // 查地址
+  if (!name || !lat || !lng) {
+    console.log('必填欄位缺失：', { name, lat, lng });
+    res.status(400).send('名稱、緯度和經度為必填！');
+    return;
+  }
+
+  const latNum = parseFloat(lat);
+  const lngNum = parseFloat(lng);
+  if (isNaN(latNum) || isNaN(lngNum)) {
+    console.log('經緯度格式錯誤：', { lat, lng });
+    res.status(400).send('經緯度格式錯誤！');
+    return;
+  }
+
   let location = '地址未知';
   try {
     const response = await axios.get(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latNum}&lon=${lngNum}&zoom=18&addressdetails=1`,
       {
         headers: {
           'User-Agent': 'PetSearchUnited/1.0 (steven6b16@gmail.com)'
         },
-        timeout: 10000 // 加10秒超時
+        timeout: 10000
       }
     );
     const address = response.data.address;
@@ -42,11 +58,11 @@ app.post('/api/report-lost', upload.single('photo'), async (req, res) => {
   }
 
   db.run(
-    'INSERT INTO lost_pets (name, breed, color, lat, lng, photo, location) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [name, breed, color, lat, lng, photo, location],
+    'INSERT INTO lost_pets (name, breed, color, lat, lng, photo, location, species) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [name || null, breed || null, color || null, latNum, lngNum, photo, location, species || null],
     (err) => {
       if (err) {
-        console.log('存資料失敗啦：', err);
+        console.log('存資料失敗啦：', err.message);
         res.send('報失失敗！');
       } else {
         console.log('存資料成功！地址：', location);
@@ -57,9 +73,9 @@ app.post('/api/report-lost', upload.single('photo'), async (req, res) => {
 });
 
 app.get('/api/lost-pets', (req, res) => {
-  db.all('SELECT * FROM lost_pets', (err, rows) => {
+  db.all('SELECT * FROM lost_pets', [], (err, rows) => {
     if (err) {
-      console.log('查資料失敗啦：', err);
+      console.log('查資料失敗啦：', err.message);
       res.status(500).send('查詢失敗！');
     } else {
       console.log('查到資料：', rows);

@@ -1,83 +1,87 @@
 .App {
-  text-align: center;
-  margin: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
   font-family: Arial, sans-serif;
 }
 
 .app-header {
-  background-color: #4CAF50;
-  color: white;
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 20px;
+  text-align: center;
+  margin-bottom: 40px;
 }
 
 .app-header h1 {
-  margin: 0;
-  font-size: 2.5em; /* 增大標題 */
+  font-size: 2.5em;
+  color: #333;
 }
 
 .app-header p {
-  margin: 5px 0 0;
-  font-size: 1.1em;
+  font-size: 1.2em;
+  color: #666;
 }
 
-h2 {
-  color: #555;
-  margin-top: 20px;
+.report-button {
+  display: inline-block;
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  text-decoration: none;
+  border-radius: 5px;
+  margin-top: 10px;
 }
 
-form {
+.report-button:hover {
+  background-color: #0056b3;
+}
+
+.search-section {
   display: flex;
-  flex-direction: column;
-  gap: 15px;
-  max-width: 400px;
-  margin: 0 auto;
-  padding: 20px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.search-input {
+  padding: 8px;
+  width: 300px;
+  margin-right: 10px;
   border: 1px solid #ccc;
-  border-radius: 8px;
-  background-color: #f9f9f9;
+  border-radius: 4px;
 }
 
-label {
-  font-weight: bold;
-  margin-bottom: 5px;
-  display: block;
-}
-
-input[type="text"],
-input[type="file"] {
+.category-select {
   padding: 8px;
   border: 1px solid #ccc;
   border-radius: 4px;
-  width: 100%;
-  box-sizing: border-box;
 }
 
-button {
-  padding: 10px;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-button:hover {
-  background-color: #45a049;
+.pet-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 40px;
 }
 
 .pet-card {
-  border: 1px solid #ccc;
-  padding: 15px;
-  margin: 10px auto;
-  max-width: 400px;
-  border-radius: 8px;
+  display: flex;
+  border: 1px solid #ddd;
+  padding: 10px;
+  border-radius: 5px;
   background-color: #fff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.pet-card img {
-  border-radius: 4px;
-  margin-top: 10px;
+.pet-image {
+  margin-right: 10px;
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 5px;
+}
+
+.pet-info p {
+  margin: 5px 0;
+}
+
+.map-container {
+  height: 400px;
+  width: 100%;
 }

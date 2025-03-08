@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, ZoomControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './App.css';
@@ -15,154 +15,99 @@ const defaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = defaultIcon;
 
-function LocationMarker({ setPosition }) {
-  useMapEvents({
-    click(e) {
-      setPosition([e.latlng.lat, e.latlng.lng]);
-    },
-  });
-  return null;
-}
-
 function App() {
-  const [name, setName] = useState('');
-  const [breed, setBreed] = useState('');
-  const [color, setColor] = useState('');
-  const [position, setPosition] = useState(null);
-  const [photo, setPhoto] = useState(null);
   const [lostPets, setLostPets] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterBreed, setFilterBreed] = useState('');
-  const [filterColor, setFilterColor] = useState('');
+  const [category, setCategory] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
+    console.log('開始請求數據...');
+    setLoading(true);
     axios.get('http://localhost:5000/api/lost-pets')
       .then(response => {
+        console.log('獲取數據：', response.data);
         setLostPets(response.data);
+        setLoading(false);
       })
       .catch(error => {
-        console.log('拿資料失敗：', error);
+        console.error('拿資料失敗：', error.message);
+        setError(error.message);
+        setLoading(false);
       });
   }, []);
-
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    if (!position) {
-      alert('請在地圖上選一個地點！');
-      return;
-    }
-    const formData = new FormData();
-    formData.append('name', name);
-    formData.append('breed', breed);
-    formData.append('color', color);
-    formData.append('lat', position[0]);
-    formData.append('lng', position[1]);
-    formData.append('photo', photo);
-
-    axios.post('http://localhost:5000/api/report-lost', formData)
-      .then(response => {
-        alert(response.data);
-        axios.get('http://localhost:5000/api/lost-pets')
-          .then(response => {
-            setLostPets(response.data);
-            setPosition(null);
-          });
-      })
-      .catch(error => {
-        console.log('錯誤：', error);
-      });
-  };
 
   const filteredPets = lostPets.filter(pet => {
     const searchLower = searchTerm.toLowerCase();
     const matchSearch = (
-      pet.name.toLowerCase().includes(searchLower) ||
-      pet.lat.toString().includes(searchLower) ||
-      pet.lng.toString().includes(searchLower)
+      (pet.name ? pet.name.toLowerCase() : '').includes(searchLower) ||
+      (pet.location ? pet.location.toLowerCase() : '').includes(searchLower)
     );
-    const matchBreed = !filterBreed || pet.breed === filterBreed;
-    const matchColor = !filterColor || pet.color === filterColor;
-    return matchSearch && matchBreed && matchColor;
+    const matchCategory = category === 'all' ||
+      (category === 'cat' && (pet.species === '貓' || !pet.species)) ||
+      (category === 'dog' && (pet.species === '狗' || !pet.species));
+    return matchSearch && matchCategory;
   });
+
+  if (loading) {
+    return <div>加載中...</div>;
+  }
+
+  if (error) {
+    return <div>錯誤：{error}</div>;
+  }
 
   return (
     <div className="App">
       <header className="app-header">
-        <h1>同搜毛棄 - Pet Search United</h1>
+        <h1>同搜毛棄 - 幫您找回毛孩</h1>
         <p>尋找走失寵物的社區平台</p>
+        <a href="/report-lost" className="report-button">立即報失</a>
       </header>
-      <h2>報失寵物</h2>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label>寵物名稱：</label>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="例如：小黑" />
-        </div>
-        <div>
-          <label>品種：</label>
-          <input type="text" value={breed} onChange={(e) => setBreed(e.target.value)} placeholder="例如：拉布拉多" />
-        </div>
-        <div>
-          <label>顏色：</label>
-          <input type="text" value={color} onChange={(e) => setColor(e.target.value)} placeholder="例如：黑色" />
-        </div>
-        <div>
-          <label>走失地點（請在地圖上點選）：</label>
-          <MapContainer center={[22.3193, 114.1694]} zoom={11} style={{ height: '200px', width: '100%' }} zoomControl={false}>
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            />
-            {position && <Marker position={position}><Popup>您選的地點</Popup></Marker>}
-            <LocationMarker setPosition={setPosition} />
-          </MapContainer>
-        </div>
-        <div>
-          <label>上傳照片：</label>
-          <input type="file" onChange={(e) => setPhoto(e.target.files[0])} />
-        </div>
-        <button type="submit">提交</button>
-      </form>
 
-      <h2>走失寵物列表</h2>
-      <div>
+      <div className="search-section">
         <input
           type="text"
-          placeholder="搜尋名稱或經緯度..."
+          placeholder="搜名稱或地點..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ marginBottom: '10px', padding: '5px', width: '200px' }}
+          className="search-input"
         />
-        <div style={{ marginBottom: '10px' }}>
-          <label>篩選品種：</label>
-          <input
-            type="text"
-            value={filterBreed}
-            onChange={(e) => setFilterBreed(e.target.value)}
-            placeholder="例如：拉布拉多"
-            style={{ marginLeft: '10px', padding: '5px' }}
-          />
-          <label style={{ marginLeft: '20px' }}>篩選顏色：</label>
-          <input
-            type="text"
-            value={filterColor}
-            onChange={(e) => setFilterColor(e.target.value)}
-            placeholder="例如：黑色"
-            style={{ marginLeft: '10px', padding: '5px' }}
-          />
-        </div>
-        {filteredPets.map(pet => (
-          <div key={pet.id} className="pet-card">
-            <p>名稱：{pet.name}</p>
-            <p>品種：{pet.breed}</p>
-            <p>顏色：{pet.color}</p>
-            <p>地點：{pet.location || `經 ${pet.lat}, 緯 ${pet.lng}`}</p>
-            {pet.photo && <img src={`http://localhost:5000/${pet.photo}`} alt={pet.name} width="100" />}
-          </div>
-        ))}
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="category-select"
+        >
+          <option value="all">全部</option>
+          <option value="cat">貓</option>
+          <option value="dog">狗</option>
+        </select>
+      </div>
+
+      <h2>走失寵物列表</h2>
+      <div className="pet-list">
+        {filteredPets.length === 0 ? (
+          <p>暫無走失寵物</p>
+        ) : (
+          filteredPets.map(pet => (
+            <div key={pet.id} className="pet-card">
+              {pet.photo && (
+                <img src={`http://localhost:5000/${pet.photo}`} alt={pet.name} className="pet-image" />
+              )}
+              <div className="pet-info">
+                <p><strong>名稱：</strong>{pet.name || '未知'}</p>
+                <p><strong>物種：</strong>{pet.species || '未知'}</p>
+                <p><strong>地點：</strong>{pet.location || `經 ${pet.lat}, 緯 ${pet.lng}`}</p>
+                <p><strong>提交時間：</strong>{pet.created_at}</p>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       <h2>走失地點地圖</h2>
-      <MapContainer center={[22.3193, 114.1694]} zoom={11} style={{ height: '400px', width: '100%' }} zoomControl={true}>
+      <MapContainer center={[22.3193, 114.1694]} zoom={11} className="map-container">
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -173,10 +118,10 @@ function App() {
             <Marker key={pet.id} position={[pet.lat, pet.lng]}>
               <Popup>
                 <div>
-                  <strong>名稱：</strong>{pet.name}<br />
-                  <strong>品種：</strong>{pet.breed}<br />
-                  <strong>顏色：</strong>{pet.color}<br />
+                  <strong>名稱：</strong>{pet.name || '未知'}<br />
+                  <strong>物種：</strong>{pet.species || '未知'}<br />
                   <strong>地點：</strong>{pet.location || `經 ${pet.lat}, 緯 ${pet.lng}`}<br />
+                  <strong>提交時間：</strong>{pet.created_at}<br />
                   {pet.photo && <img src={`http://localhost:5000/${pet.photo}`} alt={pet.name} width="100" />}
                 </div>
               </Popup>
