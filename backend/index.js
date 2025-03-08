@@ -1,13 +1,45 @@
 const express = require('express');
+const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const multer = require('multer');
-const db = require('./database');
 const path = require('path');
-const axios = require('axios');
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:3000',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type'],
+}));
 app.use(express.json());
+
+const db = new sqlite3.Database('lostpet.db', (err) => {
+  if (err) {
+    console.error('數據庫連接失敗：', err.message);
+    process.exit(1);
+  } else {
+    console.log('數據庫連接成功');
+    db.serialize(() => {
+      db.run(`
+        CREATE TABLE IF NOT EXISTS lost_pets (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT,
+          breed TEXT,
+          color TEXT,
+          lat REAL,
+          lng REAL,
+          photo TEXT,
+          location TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          species TEXT,
+          gender TEXT,
+          age TEXT,
+          contact TEXT,
+          lost_date TEXT
+        )
+      `);
+    });
+  }
+});
 
 const storage = multer.diskStorage({
   destination: 'uploads/',
@@ -19,73 +51,45 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-app.post('/api/report-lost', upload.single('photo'), async (req, res) => {
-  console.log('收到數據：', req.body);
-  console.log('收到文件：', req.file);
+app.get('/api/lost-pets', (req, res) => {
+  db.all('SELECT * FROM lost_pets', [], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: '查詢失敗！' });
+      return;
+    }
+    res.json(rows);
+  });
+});
 
-  const { name, breed, color, lat, lng, species } = req.body;
+app.post('/api/report-lost', upload.single('photo'), (req, res) => {
+  const { name, breed, color, lat, lng, location, species, gender, age, contact, lost_date } = req.body;
   const photo = req.file ? req.file.path.replace(/\\/g, '/') : null;
 
   if (!name || !lat || !lng) {
-    console.log('必填欄位缺失：', { name, lat, lng });
-    res.status(400).send('名稱、緯度和經度為必填！');
-    return;
+    return res.status(400).json({ error: '名稱、緯度和經度為必填！' });
   }
 
   const latNum = parseFloat(lat);
   const lngNum = parseFloat(lng);
   if (isNaN(latNum) || isNaN(lngNum)) {
-    console.log('經緯度格式錯誤：', { lat, lng });
-    res.status(400).send('經緯度格式錯誤！');
-    return;
-  }
-
-  let location = '地址未知';
-  try {
-    const response = await axios.get(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latNum}&lon=${lngNum}&zoom=18&addressdetails=1`,
-      {
-        headers: {
-          'User-Agent': 'PetSearchUnited/1.0 (steven6b16@gmail.com)'
-        },
-        timeout: 10000
-      }
-    );
-    const address = response.data.address;
-    location = address.road || address.suburb || address.city || '未知地址';
-  } catch (error) {
-    console.log('查地址失敗：', error.message);
+    return res.status(400).json({ error: '經緯度格式錯誤！' });
   }
 
   db.run(
-    'INSERT INTO lost_pets (name, breed, color, lat, lng, photo, location, species) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [name || null, breed || null, color || null, latNum, lngNum, photo, location, species || null],
+    'INSERT INTO lost_pets (name, breed, color, lat, lng, photo, location, species, gender, age, contact, lost_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [name || null, breed || null, color || null, latNum, lngNum, photo, location || '未知地址', species || null, gender || null, age || null, contact || null, lost_date || null],
     (err) => {
       if (err) {
-        console.log('存資料失敗啦：', err.message);
-        res.send('報失失敗！');
+        console.error('存資料失敗：', err.message);
+        res.status(500).json({ error: '報失失敗！' });
       } else {
-        console.log('存資料成功！地址：', location);
-        res.send('報失成功！');
+        console.log('存資料成功！');
+        res.json({ message: '報失成功！' });
       }
     }
   );
 });
 
-app.get('/api/lost-pets', (req, res) => {
-  db.all('SELECT * FROM lost_pets', [], (err, rows) => {
-    if (err) {
-      console.log('查資料失敗啦：', err.message);
-      res.status(500).send('查詢失敗！');
-    } else {
-      console.log('查到資料：', rows);
-      res.json(rows);
-    }
-  });
-});
-
-app.use('/uploads', express.static('uploads'));
-
 app.listen(5000, () => {
-  console.log('服務器跑在 http://localhost:5000');
+  console.log('服務器運行在 http://localhost:5000');
 });
