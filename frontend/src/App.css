@@ -75,3 +75,163 @@ form button[type="button"] {
   padding: 8px 15px;
   margin-left: 10px;
 }
+
+/* App.css */
+
+/* 整體容器 */
+.container {
+  font-family: 'Arial, sans-serif';
+  background-color: #E6F7FA;
+  min-height: 100vh;
+  padding: 0;
+  margin: 0;
+}
+
+/* 導航欄 */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #fff;
+  padding: 10px 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.navLinks {
+  display: flex;
+  gap: 10px;
+}
+
+.navLink {
+  text-decoration: none;
+  color: #333;
+  padding: 8px 12px;
+  background-color: #E6F7FA;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+.userProfile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.userAvatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+}
+
+/* 四個主要按鈕 */
+.buttonSection {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  padding: 15px 20px;
+  background-color: #fff;
+  border-bottom: 1px solid #ddd;
+}
+
+.mainButton {
+  text-decoration: none;
+  color: #333;
+  padding: 8px 12px;
+  background-color: #E6F7FA;
+  border-radius: 5px;
+  font-size: 12px;
+  display: inline-block;
+}
+
+/* 主內容區域 */
+.mainContent {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+.contentWrapper {
+  display: flex;
+  gap: 20px;
+}
+
+.leftPanel {
+  flex: 1;
+}
+
+.rightPanel {
+  width: 300px;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.placeholderText {
+  color: #888;
+  font-style: italic;
+}
+
+.sectionTitle {
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+
+.petList {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+}
+
+.petCard {
+  background-color: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+}
+
+.petImage {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+}
+
+.petInfo {
+  text-align: center;
+  margin-top: 10px;
+}
+
+.petName {
+  font-size: 14px;
+  margin: 5px 0;
+}
+
+.reportButton {
+  display: inline-block;
+  padding: 5px 10px;
+  background-color: #E6F7FA;
+  color: #333;
+  text-decoration: none;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+/* 底部地圖 */
+.mapSection {
+  margin-top: 20px;
+}
+
+.map {
+  height: 300px;
+  width: 100%;
+  border-radius: 10px;
+}

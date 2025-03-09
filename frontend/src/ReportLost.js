@@ -1,254 +1,87 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import './App.css';
 
-const defaultIcon = L.icon({
-  iconUrl: '/marker-icon.png',
-  shadowUrl: '/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-L.Marker.prototype.options.icon = defaultIcon;
-
-function LocationMarker({ setLatLng, setLocation }) {
-  const [position, setPosition] = useState(null);
-
-  const map = useMapEvents({
-    click(e) {
-      console.log('地圖點擊：', e.latlng);
-      const { lat, lng } = e.latlng;
-      setPosition([lat, lng]);
-      setLatLng({ lat, lng });
-      reverseGeocode(lat, lng).then(({ fullAddress, simplifiedAddress }) => {
-        console.log('逆向地理編碼結果：', { fullAddress, simplifiedAddress });
-        setLocation(fullAddress, simplifiedAddress);
-      }).catch(err => console.error('地理編碼錯誤：', err));
-    },
-  });
-
-  return position === null ? null : <Marker position={position} icon={defaultIcon} />;
-}
-
-async function reverseGeocode(lat, lng) {
-  try {
-    const response = await axios.get(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
-      {
-        headers: {
-          'User-Agent': 'PetSearchUnited/1.0 (steven6b16@gmail.com)',
-        },
-      }
-    );
-    const fullAddress = response.data.display_name || '未知地址';
-    const addressParts = fullAddress.split(', ').filter(part => part.trim());
-    const simplifiedAddress = addressParts.length >= 2
-      ? `${addressParts[addressParts.length - 4]} ${addressParts[0]}`
-      : fullAddress;
-    return { fullAddress, simplifiedAddress };
-  } catch (error) {
-    console.error('逆向地理編碼失敗：', error.message);
-    return { fullAddress: '未知地址', simplifiedAddress: '未知地址' };
-  }
-}
-
-function ReportLost(props) {
+function ReportLost() {
   const [formData, setFormData] = useState({
-    name: '',
-    breed: '',
-    color: '',
-    lat: '',
-    lng: '',
-    location: '',
-    fullLocation: '',
-    species: '狗',
-    gender: '未知',
-    age: '',
-    contact: '',
-    lost_date: '',
-    photo: null,
+    name: '', species: '', breed: '', gender: '', age: '', color: '', lost_date: '', location: '', details: '', chipNumber: '',
+    phoneNumber: '', email: '', isPublic: false, phonePrefix: '+852'
   });
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const [photos, setPhotos] = useState([]);
+  const [map, setMap] = useState(null);
+
+  useEffect(() => {
+    const mapInstance = L.map('map').setView([22.3193, 114.1694], 10); // 預設香港
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(mapInstance);
+    mapInstance.on('click', handleMapClick);
+    setMap(mapInstance);
+
+    // 確保地圖尺寸正確
+    setTimeout(() => {
+      mapInstance.invalidateSize();
+    }, 0);
+
+    return () => mapInstance.remove(); // 清理
+  }, []);
 
   const handleChange = (e) => {
-    const { name, value, type, files } = e.target;
-    if (type === 'file') {
-      setFormData({ ...formData, photo: files[0] });
-    } else {
-      setFormData({ ...formData, [name]: value });
-    }
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  const handleMapUpdate = (latLng, fullAddress, simplifiedAddress) => {
-    setFormData(prev => ({
-      ...prev,
-      lat: latLng ? latLng.lat : prev.lat,
-      lng: latLng ? latLng.lng : prev.lng,
-      location: simplifiedAddress || prev.location,
-      fullLocation: fullAddress || prev.fullLocation,
-    }));
+  const handlePhotoChange = (e) => {
+    setPhotos([...e.target.files]);
   };
 
-  const handleGetCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          handleMapUpdate({ lat: latitude, lng: longitude }, null);
-          reverseGeocode(latitude, longitude).then(({ fullAddress, simplifiedAddress }) => {
-            handleMapUpdate({ lat: latitude, lng: longitude }, fullAddress, simplifiedAddress);
-          });
-        },
-        (err) => {
-          setError('無法獲取當前位置，請手動點選地圖！');
-          console.error('獲取位置失敗：', err);
-        }
-      );
-    } else {
-      setError('瀏覽器不支持定位功能，請手動點選地圖！');
-    }
+  const handleMapClick = (e) => {
+    const { lat, lng } = e.latlng;
+    const region = (lat >= 22 && lat <= 23 && lng >= 113 && lng <= 115) ? 'HK' : 'TW';
+    setFormData(prev => ({ ...prev, location: `${lat},${lng}`, region }));
+    if (map) L.marker([lat, lng]).addTo(map);
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
+    const formDataToSend = new FormData();
+    for (let key in formData) formDataToSend.append(key, formData[key]);
+    photos.forEach(photo => formDataToSend.append('photos', photo));
 
-    if (!formData.name) {
-      setError('名稱為必填！');
-      setMessage('');
-      return;
-    }
-    if (!formData.lat || !formData.lng) {
-      setError('請喺地圖上選擇地點！');
-      setMessage('');
-      return;
-    }
-    if (formData.contact && !/^(\d{8,}|\S+@\S+\.\S+)$/.test(formData.contact)) {
-      setError('聯繫方式應為有效電話或郵箱！');
-      setMessage('');
-      return;
-    }
-    if (formData.lost_date && isNaN(Date.parse(formData.lost_date))) {
-      setError('走失日期格式錯誤！');
-      setMessage('');
-      return;
-    }
-
-    const data = new FormData();
-    Object.keys(formData).forEach(key => {
-      if (key === 'photo' && formData[key]) {
-        data.append(key, formData[key]);
-      } else {
-        data.append(key, formData[key]);
-      }
-    });
-    data.set('location', formData.fullLocation);
-
-    try {
-      const response = await axios.post('http://localhost:5000/api/report-lost', data, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setMessage(response.data.message);
-      setError('');
-      setFormData({
-        name: '',
-        breed: '',
-        color: '',
-        lat: '',
-        lng: '',
-        location: '',
-        fullLocation: '',
-        species: '狗',
-        gender: '未知',
-        age: '',
-        contact: '',
-        lost_date: '',
-        photo: null,
-      });
-      if (props.onReportSuccess) {
-        props.onReportSuccess();
-      }
-    } catch (err) {
-      setError(err.response?.data?.error || '提交失敗！');
-      setMessage('');
-    }
+    axios.post('http://localhost:3001/api/report-lost', formDataToSend)
+      .then(res => alert(`報失成功，ID: ${res.data.lostId}`))
+      .catch(err => console.error(err));
   };
 
   return (
-    <div className="App">
-      <header className="app-header">
-        <h1>同搜毛棄 - 報失寵物</h1>
-        <p>請填寫走失寵物信息</p>
-        <a href="/" className="report-button">返回首頁</a>
-      </header>
+    <form onSubmit={handleSubmit}>
       <div>
-        {message && <p style={{ color: 'green' }}>{message}</p>}
-        {error && <p style={{ color: 'red' }}>{error}</p>}
-        <form onSubmit={handleSubmit} encType="multipart/form-data">
-          <div>
-            <label>名稱：</label>
-            <input type="text" name="name" value={formData.name} onChange={handleChange} required />
-          </div>
-          <div>
-            <label>品種：</label>
-            <input type="text" name="breed" value={formData.breed} onChange={handleChange} />
-          </div>
-          <div>
-            <label>顏色：</label>
-            <input type="text" name="color" value={formData.color} onChange={handleChange} />
-          </div>
-          <div>
-            <label>性別：</label>
-            <select name="gender" value={formData.gender} onChange={handleChange}>
-              <option value="未知">未知</option>
-              <option value="男">男</option>
-              <option value="女">女</option>
-            </select>
-          </div>
-          <div>
-            <label>年齡：</label>
-            <input type="text" name="age" value={formData.age} onChange={handleChange} placeholder="例如: 2 或 1-3" />
-          </div>
-          <div>
-            <label>聯繫方式：</label>
-            <input type="text" name="contact" value={formData.contact} onChange={handleChange} placeholder="電話或郵箱" />
-          </div>
-          <div>
-            <label>走失日期：</label>
-            <input type="date" name="lost_date" value={formData.lost_date} onChange={handleChange} />
-          </div>
-          <div>
-            <label>物種：</label>
-            <select name="species" value={formData.species} onChange={handleChange}>
-              <option value="狗">狗</option>
-              <option value="貓">貓</option>
-              <option value="其他">其他</option>
-            </select>
-          </div>
-          <div>
-            <label>照片：</label>
-            <input type="file" name="photo" accept="image/*" onChange={handleChange} />
-          </div>
-          <div>
-            <label>地點：</label>
-            <input type="text" name="location" value={formData.location} readOnly />
-            <button type="button" onClick={handleGetCurrentLocation}>使用當前位置</button>
-            <MapContainer center={[22.3193, 114.1694]} zoom={11} style={{ height: '400px', width: '100%', marginTop: '10px' }}>
-              <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              />
-              <LocationMarker setLatLng={handleMapUpdate} setLocation={(fullAddress, simplifiedAddress) => handleMapUpdate(null, fullAddress, simplifiedAddress)} />
-            </MapContainer>
-          </div>
-          <button type="submit">提交報失</button>
-        </form>
+        <label>聯絡電話：</label>
+        <select name="phonePrefix" value={formData.phonePrefix} onChange={handleChange}>
+          <option value="+852">香港 (+852)</option>
+          <option value="+886">台灣 (+886)</option>
+        </select>
+        <input type="tel" name="phoneNumber" placeholder="電話號碼" onChange={handleChange} required />
       </div>
-    </div>
+      <div><input type="text" name="name" placeholder="寵物名稱" onChange={handleChange} required /></div>
+      <div><input type="text" name="species" placeholder="物種" onChange={handleChange} required /></div>
+      <div><input type="text" name="breed" placeholder="品種" onChange={handleChange} /></div>
+      <div><input type="text" name="gender" placeholder="性別" onChange={handleChange} required /></div>
+      <div><input type="number" name="age" placeholder="年齡" onChange={handleChange} /></div>
+      <div><input type="text" name="color" placeholder="顏色" onChange={handleChange} required /></div>
+      <div><input type="date" name="lost_date" onChange={handleChange} required /></div>
+      <div>
+        <label>遺失地點：</label>
+        <div id="map" style={{ height: '300px', width: '100%' }}></div>
+        <p>經緯度: {formData.location.split(',')[0] || '未選擇'}, {formData.location.split(',')[1] || '未選擇'}</p>
+      </div>
+      <div><textarea name="details" placeholder="其他詳情 (1000 字符)" onChange={handleChange} maxLength={1000} /></div>
+      <div><input type="text" name="chipNumber" placeholder="晶片編號" onChange={handleChange} /></div>
+      <div><input type="file" name="photos" multiple onChange={handlePhotoChange} /></div>
+      <div><label>公開聯繫方式:</label><input type="checkbox" name="isPublic" checked={formData.isPublic} onChange={handleChange} /></div>
+      <input type="hidden" name="location" value={formData.location} />
+      <button type="submit">提交</button>
+    </form>
   );
 }
 

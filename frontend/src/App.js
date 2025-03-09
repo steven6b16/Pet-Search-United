@@ -1,155 +1,122 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Link } from 'react-router-dom';
+import ReportLost from './ReportLost';
+import ReportFound from './ReportFound';
+import PetDetail from './PetDetail';
 import axios from 'axios';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import './App.css';
-import ReportLost from './ReportLost';
-
-const defaultIcon = L.icon({
-  iconUrl: '/marker-icon.png',
-  shadowUrl: '/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-L.Marker.prototype.options.icon = defaultIcon;
-
-function simplifyAddress(fullAddress) {
-  if (!fullAddress) return '未知地址';
-  const addressParts = fullAddress.split(', ').filter(part => part.trim());
-  return addressParts.length >= 2
-    ? `${addressParts[addressParts.length - 4]} ${addressParts[0]}`
-    : fullAddress;
-}
+import 'leaflet/dist/leaflet.css'; // 引入 Leaflet CSS
+import './App.css'; // 引入 App.css
 
 function App() {
   const [lostPets, setLostPets] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [category, setCategory] = useState('all');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const fetchPets = async () => {
-    console.log('開始請求數據...');
-    setLoading(true);
-    try {
-      const response = await axios.get('http://localhost:5000/api/lost-pets', {
-        headers: { 'Content-Type': 'application/json' },
-        withCredentials: false,
-      });
-      setLostPets(response.data || []);
-      setLoading(false);
-    } catch (error) {
-      console.error('拿資料失敗：', error.message);
-      setError(error.message);
-      setLoading(false);
-    }
-  };
+  const [foundPets, setFoundPets] = useState([]);
 
   useEffect(() => {
-    fetchPets();
+    // 獲取走失寵物數據
+    axios.get('http://localhost:3001/api/lost-pets')
+      .then(res => setLostPets(res.data))
+      .catch(err => {
+        console.error('獲取走失寵物失敗:', err.message);
+        alert('無法連接到後端服務，請檢查後端是否運行');
+      });
+
+    // 獲取報料寵物數據
+    axios.get('http://localhost:3001/api/found-pets')
+      .then(res => setFoundPets(res.data))
+      .catch(err => {
+        console.error('獲取報料寵物失敗:', err.message);
+        alert('無法連接到後端服務，請檢查後端是否運行');
+      });
   }, []);
-
-  const filteredPets = lostPets.filter(pet => {
-    const searchLower = searchTerm.toLowerCase();
-    const matchSearch = (
-      (pet.name ? pet.name.toLowerCase() : '').includes(searchLower) ||
-      (pet.location ? pet.location.toLowerCase() : '').includes(searchLower)
-    );
-    const matchCategory = category === 'all' ||
-      (category === 'cat' && (pet.species === '貓' || !pet.species)) ||
-      (category === 'dog' && (pet.species === '狗' || !pet.species));
-    return matchSearch && matchCategory;
-  });
-
-  if (loading) {
-    return <div>加載中...</div>;
-  }
-
-  if (error) {
-    return <div>錯誤：{error}</div>;
-  }
 
   return (
     <Router>
-      <div className="App">
-        <header className="app-header">
-          <h1>同搜毛棄 - 幫您找回毛孩</h1>
-          <p>尋找走失寵物的社區平台</p>
-          <Link to="/report-lost" className="report-button">立即報失</Link>
-        </header>
+      <div className="container">
+        {/* 導航欄 */}
+        <nav className="navbar">
+          <div className="logo">LOGO</div>
+          <div className="navLinks">
+            <Link to="/" className="navLink">首頁</Link>
+            <Link to="/account" className="navLink">帳戶</Link>
+          </div>
+          <div className="userProfile">
+            <span>報料者: User Name</span>
+            <img src="https://via.placeholder.com/30" alt="User" className="userAvatar" />
+          </div>
+        </nav>
 
         <Routes>
+          <Route path="/report-lost" element={<ReportLost />} />
+          <Route path="/report-found" element={<ReportFound />} />
+          <Route path="/pet/:id" element={<PetDetail />} />
+          <Route path="/account" element={<div>帳戶頁面（待開發）</div>} />
           <Route path="/" element={
-            <>
-              <div className="search-section">
-                <input
-                  type="text"
-                  placeholder="搜名稱或地點..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="search-input"
-                />
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="category-select"
-                >
-                  <option value="all">全部</option>
-                  <option value="cat">貓</option>
-                  <option value="dog">狗</option>
-                </select>
+            <div className="mainContent">
+              {/* 四個主要按鈕 */}
+              <div className="buttonSection">
+                <Link to="/report-found" className="mainButton">同搜報料</Link>
+                <Link to="/report-lost" className="mainButton">報失列表</Link>
+                <Link to="/" className="mainButton">主人報失</Link>
+                <Link to="/" className="mainButton">我要報料</Link>
               </div>
-
-              <h2>走失寵物列表</h2>
-              <div className="pet-list">
-                {filteredPets.length === 0 ? (
-                  <p>暫無走失寵物</p>
-                ) : (
-                  filteredPets.map(pet => (
-                    <div key={pet.id} className="pet-card">
-                      {pet.photo && (
-                        <img src={`http://localhost:5000/${pet.photo}`} alt={pet.name} className="pet-image" />
-                      )}
-                      <div className="pet-info">
-                        <p><strong>名稱：</strong>{pet.name || '未知'}</p>
-                        <p><strong>物種：</strong>{pet.species || '未知'}</p>
-                        <p><strong>走失日期：</strong>{pet.lost_date || '未知'}</p>
-                        <p><strong>地點：</strong>{simplifyAddress(pet.location)}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <h2>走失地點地圖</h2>
-              <MapContainer center={[22.3193, 114.1694]} zoom={11} className="map-container">
-                <TileLayer
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                />
-                {filteredPets
-                  .filter(pet => pet.lat != null && pet.lng != null)
-                  .map(pet => (
-                    <Marker key={pet.id} position={[pet.lat, pet.lng]}>
-                      <Popup>
-                        <div>
-                          <strong>名稱：</strong>{pet.name || '未知'}<br />
-                          <strong>物種：</strong>{pet.species || '未知'}<br />
-                          <strong>走失日期：</strong>{pet.lost_date || '未知'}<br />
-                          <strong>地點：</strong>{simplifyAddress(pet.location)}<br />
-                          {pet.photo && <img src={`http://localhost:5000/${pet.photo}`} alt={pet.name} width="100" />}
+              <div className="contentWrapper">
+                {/* 左側走失寵物列表 */}
+                <div className="leftPanel">
+                  <h2 className="sectionTitle">走失寵物列表</h2>
+                  <div className="petList">
+                    {lostPets.map(pet => (
+                      <div key={pet.lostId} className="petCard">
+                        {pet.photos && (
+                          <img
+                            src={`http://localhost:3001/uploads/${pet.photos.split(',')[0].split('/').pop()}`}
+                            alt={pet.name}
+                            className="petImage"
+                          />
+                        )}
+                        <div className="petInfo">
+                          <p className="petName">{pet.name}</p>
+                          <Link to={`/pet/${pet.lostId}`} className="reportButton">報料</Link>
                         </div>
-                      </Popup>
-                    </Marker>
-                  ))}
-              </MapContainer>
-            </>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 右側單品位置（留空） */}
+                <div className="rightPanel">
+                  <h2 className="sectionTitle">單品位置</h2>
+                  <p className="placeholderText">（暫時留空，日後添加內容）</p>
+                </div>
+              </div>
+
+              {/* 底部地圖 */}
+              <div className="mapSection">
+                <MapContainer center={[22.3193, 114.1694]} zoom={10} style={{ height: '300px', width: '100%', borderRadius: '10px' }}>
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  />
+                  {lostPets.map(pet => {
+                    if (pet.location) {
+                      const [lat, lng] = pet.location.split(',').map(coord => parseFloat(coord));
+                      if (!isNaN(lat) && !isNaN(lng)) {
+                        return (
+                          <Marker key={pet.lostId} position={[lat, lng]}>
+                            <Popup>
+                              <b>{pet.name}</b><br />
+                              <a href={`/pet/${pet.lostId}`}>查看詳情</a>
+                            </Popup>
+                          </Marker>
+                        );
+                      }
+                    }
+                    return null;
+                  })}
+                </MapContainer>
+              </div>
+            </div>
           } />
-          <Route path="/report-lost" element={<ReportLost onReportSuccess={fetchPets} />} />
         </Routes>
       </div>
     </Router>
