@@ -76,7 +76,7 @@ function App() {
                         )}
                         <div className="petInfo">
                           <p className="petName">{pet.name}</p>
-                          <Link to={`/pet/${pet.lostId}`} className="reportButton">報料</Link>
+                          <Link to={`/pet/${pet.lostId}`} className="reportButton">個案詳情</Link>
                         </div>
                       </div>
                     ))}
