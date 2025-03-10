@@ -1,83 +1,237 @@
 .App {
   text-align: center;
-  margin: 20px;
   font-family: Arial, sans-serif;
 }
-
 .app-header {
-  background-color: #4CAF50;
+  background-color: #282c34;
   color: white;
   padding: 20px;
+}
+.pet-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+}
+.pet-card {
+  border: 1px solid #ddd;
   border-radius: 8px;
-  margin-bottom: 20px;
+  padding: 15px;
+  width: 250px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
-
-.app-header h1 {
-  margin: 0;
-  font-size: 2.5em; /* 增大標題 */
+.pet-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 5px;
 }
-
-.app-header p {
-  margin: 5px 0 0;
-  font-size: 1.1em;
-}
-
-h2 {
-  color: #555;
+.map-container {
+  height: 400px;
+  width: 100%;
   margin-top: 20px;
 }
-
-form {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  max-width: 400px;
-  margin: 0 auto;
-  padding: 20px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  background-color: #f9f9f9;
+.search-section {
+  margin: 20px 0;
 }
-
-label {
-  font-weight: bold;
-  margin-bottom: 5px;
-  display: block;
-}
-
-input[type="text"],
-input[type="file"] {
+.search-input, .category-select {
   padding: 8px;
+  margin: 0 10px;
+  border-radius: 5px;
   border: 1px solid #ccc;
-  border-radius: 4px;
-  width: 100%;
-  box-sizing: border-box;
 }
-
-button {
-  padding: 10px;
-  background-color: #4CAF50;
-  color: white;
+.report-button {
+  display: inline-block;
+  padding: 10px 20px;
+  background-color: #61dafb;
+  color: black;
+  text-decoration: none;
+  border-radius: 5px;
+  margin-top: 10px;
+}
+form div {
+  margin: 10px 0;
+}
+form label {
+  display: inline-block;
+  width: 100px;
+  text-align: right;
+  margin-right: 10px;
+}
+form input, form select, form button {
+  padding: 8px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+form button[type="submit"] {
+  background-color: #61dafb;
   border: none;
-  border-radius: 4px;
   cursor: pointer;
+  padding: 10px 20px;
+}
+form button[type="button"] {
+  background-color: #ddd;
+  border: none;
+  cursor: pointer;
+  padding: 8px 15px;
+  margin-left: 10px;
 }
 
-button:hover {
-  background-color: #45a049;
+/* App.css */
+
+/* 整體容器 */
+.container {
+  font-family: 'Arial, sans-serif';
+  background-color: #E6F7FA;
+  min-height: 100vh;
+  padding: 0;
+  margin: 0;
 }
 
-.pet-card {
-  border: 1px solid #ccc;
-  padding: 15px;
-  margin: 10px auto;
-  max-width: 400px;
-  border-radius: 8px;
+/* 導航欄 */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   background-color: #fff;
+  padding: 10px 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.pet-card img {
-  border-radius: 4px;
+.logo {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.navLinks {
+  display: flex;
+  gap: 10px;
+}
+
+.navLink {
+  text-decoration: none;
+  color: #333;
+  padding: 8px 12px;
+  background-color: #E6F7FA;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+.userProfile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.userAvatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+}
+
+/* 四個主要按鈕 */
+.buttonSection {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  padding: 15px 20px;
+  background-color: #fff;
+  border-bottom: 1px solid #ddd;
+}
+
+.mainButton {
+  text-decoration: none;
+  color: #333;
+  padding: 8px 12px;
+  background-color: #E6F7FA;
+  border-radius: 5px;
+  font-size: 12px;
+  display: inline-block;
+}
+
+/* 主內容區域 */
+.mainContent {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+.contentWrapper {
+  display: flex;
+  gap: 20px;
+}
+
+.leftPanel {
+  flex: 1;
+}
+
+.rightPanel {
+  width: 300px;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.placeholderText {
+  color: #888;
+  font-style: italic;
+}
+
+.sectionTitle {
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+
+.petList {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+}
+
+.petCard {
+  background-color: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+}
+
+.petImage {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+}
+
+.petInfo {
+  text-align: center;
   margin-top: 10px;
+}
+
+.petName {
+  font-size: 14px;
+  margin: 5px 0;
+}
+
+.reportButton {
+  display: inline-block;
+  padding: 5px 10px;
+  background-color: #E6F7FA;
+  color: #333;
+  text-decoration: none;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+/* 底部地圖 */
+.mapSection {
+  margin-top: 20px;
+}
+
+.map {
+  height: 300px;
+  width: 100%;
+  border-radius: 10px;
 }
