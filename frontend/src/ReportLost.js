@@ -86,6 +86,31 @@ function ReportLost() {
     { value: 'mixed_breed_dog_20220113', label: 'Mixed Breed Dog / Mongrel 混種犬 / 唐狗' },
   ];
 
+  const petgender = [
+    { value: 'male', label: 'Male 男' },
+    { value: 'female', label: 'Female 女' },
+  ];
+
+  const petage = [
+    { value: 'lt3m', label: '13週以下' },
+    { value: '13w11m', label: '13週至11個月' },
+    { value: '1y', label: '1歲' },
+    { value: '2y', label: '2歲' },
+    { value: '3y', label: '3歲' },
+    { value: '4y', label: '4歲' },
+    { value: '5y', label: '5歲' },
+    { value: '6y', label: '6歲' },
+    { value: '7y', label: '7歲' },
+    { value: '8y', label: '8歲' },
+    { value: '9y', label: '9歲' },
+    { value: '10y', label: '10歲' },
+    { value: '11y', label: '11歲' },
+    { value: '12y', label: '12歲' },
+    { value: '13y', label: '13歲' },
+    { value: '14y', label: '14歲' },
+    { value: 'me15y', label: '15歲或以上' }
+  ];
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
@@ -162,8 +187,24 @@ function ReportLost() {
           ))}
         </select>
       </div>
-      <div><input type="text" name="gender" placeholder="性別" onChange={handleChange} required /></div>
-      <div><input type="number" name="age" placeholder="年齡" onChange={handleChange} /></div>
+      <div>
+        <label>性別：</label>
+        <select name="gender" value={formData.gender} onChange={handleChange}> {/* Corrected from formData.petgender to formData.gender */}
+          <option value="">選擇性別</option>
+          {petgender.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label>年齡：</label>
+        <select name="age" value={formData.age} onChange={handleChange}> {/* Corrected from formData.petgender to formData.gender */}
+          <option value="">選擇年齡</option>
+          {petage.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </div>
       <div><input type="text" name="color" placeholder="顏色" onChange={handleChange} required /></div>
       <div><input type="date" name="lost_date" onChange={handleChange} required /></div>
       <div>
