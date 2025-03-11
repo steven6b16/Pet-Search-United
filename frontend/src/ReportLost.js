@@ -23,10 +23,10 @@ function LocationMarker({ setLatLng, setLocation }) {
       console.log('地圖點擊：', e.latlng);
       const { lat, lng } = e.latlng;
       setPosition([lat, lng]);
-      setLatLng({ lat, lng }); // 觸發 handleMapUpdate 更新經緯度和 region
+      setLatLng({ lat, lng });
       reverseGeocode(lat, lng).then(({ fullAddress, simplifiedAddress }) => {
         console.log('逆向地理編碼結果：', { fullAddress, simplifiedAddress });
-        setLocation(fullAddress, simplifiedAddress); // 直接更新地址
+        setLocation(fullAddress, simplifiedAddress);
       }).catch(err => console.error('地理編碼錯誤：', err));
     },
   });
@@ -71,6 +71,8 @@ function ReportLost() {
   });
   const [photos, setPhotos] = useState([]);
   const [latLng, setLatLng] = useState(null);
+  const [photoError, setPhotoError] = useState('');
+
 
   const catBreeds = [
     { value: 'british_shorthair', label: 'British Shorthair 英國短毛貓' },
@@ -116,8 +118,39 @@ function ReportLost() {
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  const handlePhotoChange = (e) => {
-    setPhotos([...e.target.files]);
+  const handlePhotoChange = async (e) => {
+    const files = [...e.target.files];
+    setPhotos(files);
+    setPhotoError(''); // 每次選擇新文件時清空錯誤訊息
+
+    if (files.length > 0) {
+      const formData = new FormData();
+      formData.append('image', files[0]);
+
+      try {
+        const response = await axios.post('http://127.0.0.1:5001/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        const { has_pet, message } = response.data;
+        if (has_pet) {
+          const petType = message.toLowerCase().includes('cat') ? 'cat' : 'dog';
+          setFormData(prev => ({ ...prev, petType }));
+          console.log('檢測結果：', message);
+        } else {
+          setFormData(prev => ({ ...prev, petType: '' }));
+          console.log('無寵物檢測到：', message);
+          setPhotoError('圖片檢測失敗，請選擇其他圖片'); // 設置錯誤訊息
+          setPhotos([]); // 清除已選擇的文件
+          setFormData(prev => ({ ...prev, petType: '' }));
+          e.target.value = ""; // 重置文件輸入框
+        }
+      } catch (error) {
+        setPhotoError('圖片檢測失敗，請選擇其他圖片'); // 設置錯誤訊息
+        setPhotos([]); // 清除已選擇的文件
+        setFormData(prev => ({ ...prev, petType: '' }));
+        e.target.value = ""; // 重置文件輸入框
+      }
+    }
   };
 
   const handleMapUpdate = (latLngObj) => {
@@ -189,7 +222,7 @@ function ReportLost() {
       </div>
       <div>
         <label>性別：</label>
-        <select name="gender" value={formData.gender} onChange={handleChange}> {/* Corrected from formData.petgender to formData.gender */}
+        <select name="gender" value={formData.gender} onChange={handleChange}>
           <option value="">選擇性別</option>
           {petgender.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
@@ -198,7 +231,7 @@ function ReportLost() {
       </div>
       <div>
         <label>年齡：</label>
-        <select name="age" value={formData.age} onChange={handleChange}> {/* Corrected from formData.petgender to formData.gender */}
+        <select name="age" value={formData.age} onChange={handleChange}>
           <option value="">選擇年齡</option>
           {petage.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
@@ -220,7 +253,10 @@ function ReportLost() {
       </div>
       <div><textarea name="details" placeholder="其他詳情 (1000 字符)" onChange={handleChange} maxLength={1000} /></div>
       <div><input type="text" name="chipNumber" placeholder="晶片編號" onChange={handleChange} /></div>
-      <div><input type="file" name="photos" multiple onChange={handlePhotoChange} /></div>
+      <div>
+        <input type="file" name="photos" multiple onChange={handlePhotoChange} />
+        {photoError && <p style={{ color: 'red' }}>{photoError}</p>} {/* 顯示錯誤訊息 */}
+      </div>
       <div><label>公開聯繫方式:</label><input type="checkbox" name="isPublic" checked={formData.isPublic} onChange={handleChange} /></div>
       <input type="hidden" name="region" value={formData.region} />
       <input type="hidden" name="location" value={formData.location} />
