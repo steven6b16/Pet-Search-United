@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'; // 導入 useMapEvents
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -23,10 +23,10 @@ function LocationMarker({ setLatLng, setLocation }) {
       console.log('地圖點擊：', e.latlng);
       const { lat, lng } = e.latlng;
       setPosition([lat, lng]);
-      setLatLng({ lat, lng });
+      setLatLng({ lat, lng }); // 觸發 handleMapUpdate 更新經緯度和 region
       reverseGeocode(lat, lng).then(({ fullAddress, simplifiedAddress }) => {
         console.log('逆向地理編碼結果：', { fullAddress, simplifiedAddress });
-        setLocation(fullAddress, simplifiedAddress);
+        setLocation(fullAddress, simplifiedAddress); // 直接更新地址
       }).catch(err => console.error('地理編碼錯誤：', err));
     },
   });
@@ -38,11 +38,11 @@ async function reverseGeocode(lat, lng) {
   try {
     const response = await axios.get(`http://localhost:3001/geocode?lat=${lat}&lon=${lng}`);
     const fullAddress = response.data.display_name || '未知地址';
-    const addressParts = fullAddress.split(', ').filter(part => part.trim());
+    const addressParts = fullAddress.split(', ').filter(part => part.trim() !== '中華人民共和國');
     const simplifiedAddress = addressParts.length >= 2
       ? `${addressParts[addressParts.length - 4] || ''} ${addressParts[0]}`.trim()
       : fullAddress;
-    return { fullAddress, simplifiedAddress };
+    return { fullAddress: addressParts.join(', '), simplifiedAddress };
   } catch (error) {
     console.error('逆向地理編碼失敗：', error.message);
     return { fullAddress: '未知地址', simplifiedAddress: '未知地點' };
@@ -95,26 +95,42 @@ function ReportLost() {
     setPhotos([...e.target.files]);
   };
 
-  const handleMapUpdate = (latLngObj, fullAddress, simplifiedAddress) => {
+  const handleMapUpdate = (latLngObj) => {
+    console.log('更新地圖，latLngObj:', latLngObj);
+    const newRegion = latLngObj
+      ? (latLngObj.lat >= 22.1 && latLngObj.lat <= 22.6 && latLngObj.lng >= 113.8 && latLngObj.lng <= 114.4)
+        ? 'HK'
+        : (latLngObj.lat >= 21.9 && latLngObj.lat <= 25.3 && latLngObj.lng >= 120.0 && latLngObj.lng <= 122.0)
+          ? 'TW'
+          : 'UNKNOWN'
+      : formData.region;
+    console.log('計算地區:', newRegion);
     setFormData(prev => ({
       ...prev,
       location: latLngObj ? `${latLngObj.lat},${latLngObj.lng}` : prev.location,
-      region: latLngObj && (latLngObj.lat >= 22 && latLngObj.lat <= 23 && latLngObj.lng >= 113 && latLngObj.lng <= 115) ? 'HK' : 'TW',
-      fullAddress: fullAddress || prev.fullAddress,
-      displayLocation: simplifiedAddress || prev.displayLocation
+      region: newRegion
     }));
     setLatLng(latLngObj);
   };
 
+  const handleSetLocation = (fullAddress, simplifiedAddress) => {
+    setFormData(prev => ({
+      ...prev,
+      fullAddress: fullAddress || prev.fullAddress,
+      displayLocation: simplifiedAddress || prev.displayLocation
+    }));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    console.log('提交前 formData:', formData);
     const formDataToSend = new FormData();
     for (let key in formData) formDataToSend.append(key, formData[key]);
     photos.forEach(photo => formDataToSend.append('photos', photo));
 
     axios.post('http://localhost:3001/api/report-lost', formDataToSend)
       .then(res => alert(`報失成功，ID: ${res.data.lostId}`))
-      .catch(err => console.error(err));
+      .catch(err => console.error('提交失敗:', err));
   };
 
   return (
@@ -157,7 +173,7 @@ function ReportLost() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           />
-          <LocationMarker setLatLng={handleMapUpdate} setLocation={(fullAddress, simplifiedAddress) => handleMapUpdate(null, fullAddress, simplifiedAddress)} />
+          <LocationMarker setLatLng={handleMapUpdate} setLocation={handleSetLocation} />
         </MapContainer>
         <p>地點: {formData.displayLocation || '未選擇'}</p>
       </div>
@@ -165,6 +181,7 @@ function ReportLost() {
       <div><input type="text" name="chipNumber" placeholder="晶片編號" onChange={handleChange} /></div>
       <div><input type="file" name="photos" multiple onChange={handlePhotoChange} /></div>
       <div><label>公開聯繫方式:</label><input type="checkbox" name="isPublic" checked={formData.isPublic} onChange={handleChange} /></div>
+      <input type="hidden" name="region" value={formData.region} />
       <input type="hidden" name="location" value={formData.location} />
       <input type="hidden" name="fullAddress" value={formData.fullAddress} />
       <button type="submit">提交</button>
