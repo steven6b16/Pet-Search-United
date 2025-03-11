@@ -1,3 +1,3 @@
 venv/
 uploads/
-*.pyc
+*.pyc"backend/lost_pets.db" 
