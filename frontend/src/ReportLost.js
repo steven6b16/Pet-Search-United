@@ -1,16 +1,76 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'; // 導入 useMapEvents
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
+// 使用本地圖標（假設圖標文件在 public 目錄下）
+const defaultIcon = L.icon({
+  iconUrl: '/marker-icon.png',
+  shadowUrl: '/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+L.Marker.prototype.options.icon = defaultIcon;
+
+function LocationMarker({ setLatLng, setLocation }) {
+  const [position, setPosition] = useState(null);
+
+  const map = useMapEvents({
+    click(e) {
+      console.log('地圖點擊：', e.latlng);
+      const { lat, lng } = e.latlng;
+      setPosition([lat, lng]);
+      setLatLng({ lat, lng });
+      reverseGeocode(lat, lng).then(({ fullAddress, simplifiedAddress }) => {
+        console.log('逆向地理編碼結果：', { fullAddress, simplifiedAddress });
+        setLocation(fullAddress, simplifiedAddress);
+      }).catch(err => console.error('地理編碼錯誤：', err));
+    },
+  });
+
+  return position === null ? null : <Marker position={position} />;
+}
+
+async function reverseGeocode(lat, lng) {
+  try {
+    const response = await axios.get(`http://localhost:3001/geocode?lat=${lat}&lon=${lng}`);
+    const fullAddress = response.data.display_name || '未知地址';
+    const addressParts = fullAddress.split(', ').filter(part => part.trim());
+    const simplifiedAddress = addressParts.length >= 2
+      ? `${addressParts[addressParts.length - 4] || ''} ${addressParts[0]}`.trim()
+      : fullAddress;
+    return { fullAddress, simplifiedAddress };
+  } catch (error) {
+    console.error('逆向地理編碼失敗：', error.message);
+    return { fullAddress: '未知地址', simplifiedAddress: '未知地點' };
+  }
+}
+
 function ReportLost() {
   const [formData, setFormData] = useState({
-    name: '', petType: '', breed: '', gender: '', age: '', color: '', lost_date: '', location: '', details: '', chipNumber: '',
-    phoneNumber: '', email: '', isPublic: false, phonePrefix: '+852', fullAddress: '', displayLocation: ''
+    name: '',
+    petType: '',
+    breed: '',
+    gender: '',
+    age: '',
+    color: '',
+    lost_date: '',
+    location: '',
+    details: '',
+    chipNumber: '',
+    phoneNumber: '',
+    email: '',
+    isPublic: false,
+    phonePrefix: '+852',
+    fullAddress: '',
+    displayLocation: '',
+    region: ''
   });
   const [photos, setPhotos] = useState([]);
-  const [map, setMap] = useState(null);
-  const [marker, setMarker] = useState(null);
+  const [latLng, setLatLng] = useState(null);
 
   const catBreeds = [
     { value: 'british_shorthair', label: 'British Shorthair 英國短毛貓' },
@@ -26,21 +86,6 @@ function ReportLost() {
     { value: 'mixed_breed_dog_20220113', label: 'Mixed Breed Dog / Mongrel 混種犬 / 唐狗' },
   ];
 
-  useEffect(() => {
-    const mapInstance = L.map('map').setView([22.3193, 114.1694], 10);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(mapInstance);
-    mapInstance.on('click', handleMapClick);
-    setMap(mapInstance);
-
-    setTimeout(() => {
-      mapInstance.invalidateSize();
-    }, 0);
-
-    return () => mapInstance.remove();
-  }, []);
-
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
@@ -50,32 +95,15 @@ function ReportLost() {
     setPhotos([...e.target.files]);
   };
 
-  const handleMapClick = async (e) => {
-    const { lat, lng } = e.latlng;
-    const region = (lat >= 22 && lat <= 23 && lng >= 113 && lng <= 115) ? 'HK' : 'TW';
-    // 使用 Nominatim API 獲取完整地址
-    try {
-      const response = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-      const address = response.data.display_name || "未知地址";
-      const addressParts = address.split(',').map(part => part.trim());
-      const districtIndex = addressParts.findIndex(part => part.match(/區$/));
-      const displayLocation = districtIndex > -1 ? `${addressParts[districtIndex]} ${addressParts[districtIndex - 4] || ''}`.trim() : address; // 顯示區 + 上一個地標
-
-      setFormData(prev => ({ ...prev, location: `${lat},${lng}`, region, fullAddress: address, displayLocation }));
-    } catch (error) {
-      setFormData(prev => ({ ...prev, location: `${lat},${lng}`, region, fullAddress: "未知地址", displayLocation: "未知地點" }));
-    }
-    if (map) {
-      if (marker) map.removeLayer(marker); // 移除舊 PIN
-      const customIcon = L.icon({
-        iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [0, -41]
-      });
-      const newMarker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
-      setMarker(newMarker); // 儲存新 PIN
-    }
+  const handleMapUpdate = (latLngObj, fullAddress, simplifiedAddress) => {
+    setFormData(prev => ({
+      ...prev,
+      location: latLngObj ? `${latLngObj.lat},${latLngObj.lng}` : prev.location,
+      region: latLngObj && (latLngObj.lat >= 22 && latLngObj.lat <= 23 && latLngObj.lng >= 113 && latLngObj.lng <= 115) ? 'HK' : 'TW',
+      fullAddress: fullAddress || prev.fullAddress,
+      displayLocation: simplifiedAddress || prev.displayLocation
+    }));
+    setLatLng(latLngObj);
   };
 
   const handleSubmit = (e) => {
@@ -103,39 +131,18 @@ function ReportLost() {
       <div>
         <label>寵物種類：</label>
         <label>
-          <input
-            type="radio"
-            name="petType"
-            value="cat"
-            checked={formData.petType === 'cat'}
-            onChange={handleChange}
-          />
-          貓
+          <input type="radio" name="petType" value="cat" checked={formData.petType === 'cat'} onChange={handleChange} /> 貓
         </label>
         <label>
-          <input
-            type="radio"
-            name="petType"
-            value="dog"
-            checked={formData.petType === 'dog'}
-            onChange={handleChange}
-          />
-          狗
+          <input type="radio" name="petType" value="dog" checked={formData.petType === 'dog'} onChange={handleChange} /> 狗
         </label>
       </div>
       <div>
         <label>品種：</label>
-        <select
-          name="breed"
-          value={formData.breed}
-          onChange={handleChange}
-          disabled={!formData.petType}
-        >
+        <select name="breed" value={formData.breed} onChange={handleChange} disabled={!formData.petType}>
           <option value="">選擇品種</option>
           {(formData.petType === 'cat' ? catBreeds : dogBreeds).map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
+            <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
       </div>
@@ -145,7 +152,13 @@ function ReportLost() {
       <div><input type="date" name="lost_date" onChange={handleChange} required /></div>
       <div>
         <label>遺失地點：</label>
-        <div id="map" style={{ height: '300px', width: '100%' }}></div>
+        <MapContainer center={[22.3193, 114.1694]} zoom={11} style={{ height: '300px', width: '100%', marginTop: '10px' }}>
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          />
+          <LocationMarker setLatLng={handleMapUpdate} setLocation={(fullAddress, simplifiedAddress) => handleMapUpdate(null, fullAddress, simplifiedAddress)} />
+        </MapContainer>
         <p>地點: {formData.displayLocation || '未選擇'}</p>
       </div>
       <div><textarea name="details" placeholder="其他詳情 (1000 字符)" onChange={handleChange} maxLength={1000} /></div>

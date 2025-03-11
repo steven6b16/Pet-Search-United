@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const multer = require('multer');
 const path = require('path');
 const cors = require('cors');
+const axios = require('axios'); // 新增 axios 依賴
 const app = express();
 const port = 3001;
 
@@ -243,6 +244,25 @@ app.get('/api/found-pets/:id', (req, res) => {
     res.send(row);
   });
 });
+
+// === 插入新路由：代理 Nominatim 地理編碼請求 ===
+app.get('/geocode', async (req, res) => {
+  const { lat, lon } = req.query;
+  if (!lat || !lon) {
+    return res.status(400).json({ error: '缺少 lat 或 lon 參數' });
+  }
+  try {
+    const response = await axios.get(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`,
+      { headers: { 'User-Agent': 'PetSearchUnited/1.0 (your-real-email@domain.com)' } } // 替換為你的 email
+    );
+    res.json(response.data);
+  } catch (error) {
+    console.error('地理編碼失敗:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+// === 新路由插入結束 ===
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
