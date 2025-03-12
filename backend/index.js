@@ -30,14 +30,18 @@ db.serialize(() => {
       species TEXT,
       breed TEXT,
       gender TEXT,
-      age INTEGER,
+      age TEXT,              -- 改為 TEXT
       color TEXT,
       lost_date TEXT,
       location TEXT,
       details TEXT,
       chipNumber TEXT,
       photos TEXT,
+      fullAddress TEXT,      -- 新增
+      displayLocation TEXT,  -- 新增
+      region TEXT,           -- 新增
       createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      isPublic BOOLEAN DEFAULT 0,
       FOREIGN KEY (userId) REFERENCES users(userId)
     )
   `);
@@ -53,7 +57,6 @@ db.serialize(() => {
       }
     }
   });
-
   db.run(`
     CREATE TABLE IF NOT EXISTS found_pets (
       foundId TEXT PRIMARY KEY,
@@ -117,25 +120,34 @@ function generateId(type, region) {
 }
 
 app.post('/api/report-lost', upload.array('photos', 5), async (req, res) => {
-  console.log('接收到的 req.body:', req.body); // 添加日志
+  console.log('接收到的 req.body:', req.body);
   try {
-    const { name, species, breed, gender, age, color, lost_date, location, details, chipNumber, userId, isPublic, region = 'HK' } = req.body;
-    console.log(`解析後 region: ${region}`); // 添加日志
+    const {
+      ownername, phonePrefix, phoneNumber, email,
+      name, species, breed, gender, age, color, lost_date, location, details, chipNumber,
+      fullAddress, displayLocation, region = 'HK', isPublic
+    } = req.body;
     const photos = req.files.map(file => file.path).join(',');
     const lostId = await generateId('lost', region);
-    console.log('最終生成的 lostId:', lostId); // 添加日志
+    const isPublicValue = isPublic === 'true' || isPublic === 1 ? 1 : 0; // 新增這行
 
     const stmt = db.prepare(`
-      INSERT INTO lost_pets (lostId, userId, name, species, breed, gender, age, color, lost_date, location, details, chipNumber, photos, isPublic)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO lost_pets (
+        lostId, userId, name, species, breed, gender, age, color, lost_date, location,
+        details, chipNumber, photos, fullAddress, displayLocation, region, isPublic
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    stmt.run(lostId, userId, name, species, breed, gender, age, color, lost_date, location, details, chipNumber, photos, isPublic ? 1 : 0, (err) => {
-      if (err) {
-        console.error('插入數據失敗:', err);
-        return res.status(500).send('插入數據失敗');
+    stmt.run(
+      lostId, userId, name, species, breed, gender, age, color, lost_date, location,
+      details, chipNumber, photos, fullAddress, displayLocation, region, isPublicValue,
+      (err) => {
+        if (err) {
+          console.error('插入數據失敗:', err);
+          return res.status(500).send('插入數據失敗');
+        }
+        res.send({ lostId });
       }
-      res.send({ lostId });
-    });
+    );
     stmt.finalize();
   } catch (err) {
     console.error('報失 API 錯誤:', err);

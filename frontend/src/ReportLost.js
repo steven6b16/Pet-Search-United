@@ -51,6 +51,10 @@ async function reverseGeocode(lat, lng) {
 
 function ReportLost() {
   const [formData, setFormData] = useState({
+    ownername: '',
+    phonePrefix: '+852',
+    phoneNumber: '',
+    email: '',
     name: '',
     petType: '',
     breed: '',
@@ -61,13 +65,10 @@ function ReportLost() {
     location: '',
     details: '',
     chipNumber: '',
-    phoneNumber: '',
-    email: '',
-    isPublic: false,
-    phonePrefix: '+852',
     fullAddress: '',
     displayLocation: '',
-    region: ''
+    region: '',
+    isPublic: false,
   });
   const [photos, setPhotos] = useState([]);
   const [latLng, setLatLng] = useState(null);
@@ -193,6 +194,11 @@ function ReportLost() {
 
   return (
     <form onSubmit={handleSubmit}>
+      <h2>主人資料</h2>
+      <div>
+        <label>你的稱呼：</label>
+        <input type="tel" name="ownername" placeholder="如何稱呼你" onChange={handleChange} required />
+      </div>
       <div>
         <label>聯絡電話：</label>
         <select name="phonePrefix" value={formData.phonePrefix} onChange={handleChange}>
@@ -201,7 +207,16 @@ function ReportLost() {
         </select>
         <input type="tel" name="phoneNumber" placeholder="電話號碼" onChange={handleChange} required />
       </div>
-      <div><input type="text" name="name" placeholder="寵物名稱" onChange={handleChange} required /></div>
+      <div>
+        <label>聯絡電郵：</label>
+        <input type="email" name="email" placeholder="電郵地址" onChange={handleChange} required />
+      </div>
+      <hr/>
+      <h2>寵物資料</h2>
+      <label>寵物名稱：</label>
+      <label>
+      <input type="text" name="name" placeholder="寵物名稱" onChange={handleChange} required />
+      </label>
       <div>
         <label>寵物種類：</label>
         <label>
@@ -238,8 +253,14 @@ function ReportLost() {
           ))}
         </select>
       </div>
-      <div><input type="text" name="color" placeholder="顏色" onChange={handleChange} required /></div>
-      <div><input type="date" name="lost_date" onChange={handleChange} required /></div>
+      <div>
+        <label>顏色：</label>
+        <input type="text" name="color" placeholder="顏色" onChange={handleChange} required />
+      </div>
+      <div>
+        <label>遺失時間：</label>
+        <input type="date" name="lost_date" onChange={handleChange} required />
+      </div>
       <div>
         <label>遺失地點：</label>
         <MapContainer center={[22.3193, 114.1694]} zoom={11} style={{ height: '300px', width: '100%', marginTop: '10px' }}>
