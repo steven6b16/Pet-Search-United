@@ -196,98 +196,251 @@ function ReportLost() {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <h2>主人資料</h2>
-      <div>
-        <label>你的稱呼：</label>
-        <input type="tel" name="ownername" placeholder="如何稱呼你" onChange={handleChange} required />
+    <section className="section">
+      {/* 引入 Bulma CDN */}
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css" />
+      <div className="container">
+        <form onSubmit={handleSubmit}>
+          <h2 className="title is-4">主人資料</h2>
+          <div className="field">
+            <label className="label">你的稱呼</label>
+            <div className="control">
+              <input
+                className="input"
+                type="text"
+                name="ownername"
+                placeholder="如何稱呼你"
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="label">聯絡電話</label>
+            <div className="control is-flex">
+              <div className="select">
+                <select name="phonePrefix" value={formData.phonePrefix} onChange={handleChange}>
+                  <option value="+852">香港 (+852)</option>
+                  <option value="+886">台灣 (+886)</option>
+                </select>
+              </div>
+              <input
+                className="input ml-2"
+                type="tel"
+                name="phoneNumber"
+                placeholder="電話號碼"
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="label">聯絡電郵</label>
+            <div className="control">
+              <input
+                className="input"
+                type="email"
+                name="email"
+                placeholder="電郵地址"
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                name="isPublic"
+                checked={formData.isPublic}
+                onChange={handleChange}
+              /> 公開聯繫資料
+            </label>
+          </div>
+
+          <hr />
+
+          <h2 className="title is-4">寵物資料</h2>
+          <div className="field">
+            <label className="label">寵物名稱</label>
+            <div className="control">
+              <input
+                className="input"
+                type="text"
+                name="name"
+                placeholder="寵物名稱"
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="label">寵物種類</label>
+            <div className="control">
+              <label className="radio mr-4">
+                <input
+                  type="radio"
+                  name="petType"
+                  value="cat"
+                  checked={formData.petType === 'cat'}
+                  onChange={handleChange}
+                /> 貓
+              </label>
+              <label className="radio">
+                <input
+                  type="radio"
+                  name="petType"
+                  value="dog"
+                  checked={formData.petType === 'dog'}
+                  onChange={handleChange}
+                /> 狗
+              </label>
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="label">品種</label>
+            <div className="control">
+              <div className="select is-fullwidth">
+                <select
+                  name="breed"
+                  value={formData.breed}
+                  onChange={handleChange}
+                  disabled={!formData.petType}
+                >
+                  <option value="">選擇品種</option>
+                  {(formData.petType === 'cat' ? catBreeds : dogBreeds).map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="label">性別</label>
+            <div className="control">
+              <div className="select is-fullwidth">
+                <select name="gender" value={formData.gender} onChange={handleChange}>
+                  <option value="">選擇性別</option>
+                  {petgender.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="label">年齡</label>
+            <div className="control">
+              <div className="select is-fullwidth">
+                <select name="age" value={formData.age} onChange={handleChange}>
+                  <option value="">選擇年齡</option>
+                  {petage.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="label">顏色</label>
+            <div className="control">
+              <input
+                className="input"
+                type="text"
+                name="color"
+                placeholder="顏色"
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="label">遺失時間</label>
+            <div className="control">
+              <input
+                className="input"
+                type="date"
+                name="lost_date"
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="label">遺失地點</label>
+            <div className="control">
+              <MapContainer center={[22.3193, 114.1694]} zoom={11} style={{ height: '300px', width: '100%' }}>
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                />
+                <LocationMarker setLatLng={handleMapUpdate} setLocation={handleSetLocation} />
+              </MapContainer>
+              <p className="help">地點: {formData.displayLocation || '未選擇'}</p>
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="label">其他詳情</label>
+            <div className="control">
+              <textarea
+                className="textarea"
+                name="details"
+                placeholder="其他詳情 (1000 字符)"
+                onChange={handleChange}
+                maxLength={1000}
+              />
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="label">晶片編號</label>
+            <div className="control">
+              <input
+                className="input"
+                type="text"
+                name="chipNumber"
+                placeholder="晶片編號"
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div className="field">
+            <label className="label">上傳照片</label>
+            <div className="control">
+              <input
+                className="input"
+                type="file"
+                name="photos"
+                multiple
+                onChange={handlePhotoChange}
+              />
+              {photoError && <p className="help is-danger">{photoError}</p>}
+            </div>
+          </div>
+          <input type="hidden" name="region" value={formData.region} />
+          <input type="hidden" name="location" value={formData.location} />
+          <input type="hidden" name="fullAddress" value={formData.fullAddress} />
+
+          <div className="field">
+            <div className="control">
+              <button className="button is-primary" type="submit">提交</button>
+            </div>
+          </div>
+        </form>
       </div>
-      <div>
-        <label>聯絡電話：</label>
-        <select name="phonePrefix" value={formData.phonePrefix} onChange={handleChange}>
-          <option value="+852">香港 (+852)</option>
-          <option value="+886">台灣 (+886)</option>
-        </select>
-        <input type="tel" name="phoneNumber" placeholder="電話號碼" onChange={handleChange} required />
-      </div>
-      <div>
-        <label>聯絡電郵：</label>
-        <input type="email" name="email" placeholder="電郵地址" onChange={handleChange} required />
-      </div>
-      <div><label>公開聯繫資料:</label><input type="checkbox" name="isPublic" checked={formData.isPublic} onChange={handleChange} /></div>
-      <hr/>
-      <h2>寵物資料</h2>
-      <label>寵物名稱：</label>
-      <label>
-      <input type="text" name="name" placeholder="寵物名稱" onChange={handleChange} required />
-      </label>
-      <div>
-        <label>寵物種類：</label>
-        <label>
-          <input type="radio" name="petType" value="cat" checked={formData.petType === 'cat'} onChange={handleChange} /> 貓
-        </label>
-        <label>
-          <input type="radio" name="petType" value="dog" checked={formData.petType === 'dog'} onChange={handleChange} /> 狗
-        </label>
-      </div>
-      <div>
-        <label>品種：</label>
-        <select name="breed" value={formData.breed} onChange={handleChange} disabled={!formData.petType}>
-          <option value="">選擇品種</option>
-          {(formData.petType === 'cat' ? catBreeds : dogBreeds).map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label>性別：</label>
-        <select name="gender" value={formData.gender} onChange={handleChange}>
-          <option value="">選擇性別</option>
-          {petgender.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label>年齡：</label>
-        <select name="age" value={formData.age} onChange={handleChange}>
-          <option value="">選擇年齡</option>
-          {petage.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label>顏色：</label>
-        <input type="text" name="color" placeholder="顏色" onChange={handleChange} required />
-      </div>
-      <div>
-        <label>遺失時間：</label>
-        <input type="date" name="lost_date" onChange={handleChange} required />
-      </div>
-      <div>
-        <label>遺失地點：</label>
-        <MapContainer center={[22.3193, 114.1694]} zoom={11} style={{ height: '300px', width: '100%', marginTop: '10px' }}>
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          />
-          <LocationMarker setLatLng={handleMapUpdate} setLocation={handleSetLocation} />
-        </MapContainer>
-        <p>地點: {formData.displayLocation || '未選擇'}</p>
-      </div>
-      <div><textarea name="details" placeholder="其他詳情 (1000 字符)" onChange={handleChange} maxLength={1000} /></div>
-      <div><input type="text" name="chipNumber" placeholder="晶片編號" onChange={handleChange} /></div>
-      <div>
-        <input type="file" name="photos" multiple onChange={handlePhotoChange} />
-        {photoError && <p style={{ color: 'red' }}>{photoError}</p>} {/* 顯示錯誤訊息 */}
-      </div>
-      
-      <input type="hidden" name="region" value={formData.region} />
-      <input type="hidden" name="location" value={formData.location} />
-      <input type="hidden" name="fullAddress" value={formData.fullAddress} />
-      <button type="submit">提交</button>
-    </form>
+    </section>
   );
 }
 
