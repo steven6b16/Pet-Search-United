@@ -50,14 +50,14 @@ function PetDetail() {
       <p><strong>詳情:</strong> {pet.details || pet.found_details || '無'}</p>
 
       {/* 主人資料 */}
-      {pet.isPublic && pet.contact && (
+      {pet.isPublic && (
         <div>
-          <h2>聯絡資料</h2>
-          <p><strong>聯絡人:</strong> {pet.contact.name}</p>
-          <p><strong>電話:</strong> {pet.contact.phoneNumber}</p>
-          <p><strong>電郵:</strong> {pet.contact.email}</p>
-          <a href={`tel:${pet.contact.phoneNumber}`}>電話聯絡</a> | 
-          <a href={`https://wa.me/${pet.contact.phoneNumber}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+          <h2>主人的聯絡資料</h2>
+          <p><strong>聯絡人:</strong> {pet.ownername}</p>
+          <p><strong>電話:</strong> {pet.phoneNumber}</p>
+          <p><strong>電郵:</strong> {pet.email}</p>
+          <a href={`tel:${pet.phoneNumber}`}>電話聯絡</a> | 
+          <a href={`https://wa.me/${pet.phoneNumber}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
         </div>
       )}
     </div>

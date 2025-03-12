@@ -51,13 +51,14 @@ async function reverseGeocode(lat, lng) {
 
 function ReportLost() {
   const [formData, setFormData] = useState({
+    userId: 0,
     ownername: '',
     phonePrefix: '+852',
     phoneNumber: '',
     email: '',
     name: '',
-    petType: '',
     breed: '',
+    petType: '',
     gender: '',
     age: '',
     color: '',
@@ -69,6 +70,8 @@ function ReportLost() {
     displayLocation: '',
     region: '',
     isPublic: false,
+    isFound: false,
+    isDeleted: false,
   });
   const [photos, setPhotos] = useState([]);
   const [latLng, setLatLng] = useState(null);
@@ -211,6 +214,7 @@ function ReportLost() {
         <label>聯絡電郵：</label>
         <input type="email" name="email" placeholder="電郵地址" onChange={handleChange} required />
       </div>
+      <div><label>公開聯繫資料:</label><input type="checkbox" name="isPublic" checked={formData.isPublic} onChange={handleChange} /></div>
       <hr/>
       <h2>寵物資料</h2>
       <label>寵物名稱：</label>
@@ -278,7 +282,7 @@ function ReportLost() {
         <input type="file" name="photos" multiple onChange={handlePhotoChange} />
         {photoError && <p style={{ color: 'red' }}>{photoError}</p>} {/* 顯示錯誤訊息 */}
       </div>
-      <div><label>公開聯繫方式:</label><input type="checkbox" name="isPublic" checked={formData.isPublic} onChange={handleChange} /></div>
+      
       <input type="hidden" name="region" value={formData.region} />
       <input type="hidden" name="location" value={formData.location} />
       <input type="hidden" name="fullAddress" value={formData.fullAddress} />

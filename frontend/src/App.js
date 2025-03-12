@@ -80,6 +80,37 @@ function App() {
                       <Link to="/report-found" className="button is-warning is-medium">我要報料</Link>
                     </div>
 
+                    {/* 底部地圖 */}
+                    <div className="box mt-6">
+                      <h2 className="title is-4 has-text-pet-purple mb-4">寵物地圖</h2>
+                      <MapContainer
+                        center={[22.3193, 114.1694]}
+                        zoom={10}
+                        style={{ height: '450px', width: '100%', borderRadius: '10px' }}
+                      >
+                        <TileLayer
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                          attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        />
+                        {lostPets.map(pet => {
+                          if (pet.location) {
+                            const [lat, lng] = pet.location.split(',').map(coord => parseFloat(coord));
+                            if (!isNaN(lat) && !isNaN(lng)) {
+                              return (
+                                <Marker key={pet.lostId} position={[lat, lng]}>
+                                  <Popup>
+                                    <b>{pet.name}</b><br />
+                                    <a href={`/pet/${pet.lostId}`}>查看詳情</a>
+                                  </Popup>
+                                </Marker>
+                              );
+                            }
+                          }
+                          return null;
+                        })}
+                      </MapContainer>
+                    </div>
+
                     {/* 內容區域 */}
                     <div className="columns">
                       {/* 左側走失寵物列表 */}
@@ -126,36 +157,7 @@ function App() {
                       </div>
                     </div>
 
-                    {/* 底部地圖 */}
-                    <div className="box mt-6">
-                      <h2 className="title is-4 has-text-pet-purple mb-4">寵物地圖</h2>
-                      <MapContainer
-                        center={[22.3193, 114.1694]}
-                        zoom={10}
-                        style={{ height: '300px', width: '100%', borderRadius: '10px' }}
-                      >
-                        <TileLayer
-                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                          attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                        />
-                        {lostPets.map(pet => {
-                          if (pet.location) {
-                            const [lat, lng] = pet.location.split(',').map(coord => parseFloat(coord));
-                            if (!isNaN(lat) && !isNaN(lng)) {
-                              return (
-                                <Marker key={pet.lostId} position={[lat, lng]}>
-                                  <Popup>
-                                    <b>{pet.name}</b><br />
-                                    <a href={`/pet/${pet.lostId}`}>查看詳情</a>
-                                  </Popup>
-                                </Marker>
-                              );
-                            }
-                          }
-                          return null;
-                        })}
-                      </MapContainer>
-                    </div>
+
                   </div>
                 }
               />

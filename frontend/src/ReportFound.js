@@ -1,38 +1,137 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// 使用本地圖標（假設圖標文件在 public 目錄下）
+const defaultIcon = L.icon({
+  iconUrl: '/marker-icon.png',
+  shadowUrl: '/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+L.Marker.prototype.options.icon = defaultIcon;
+
+function LocationMarker({ setLatLng, setLocation }) {
+  const [position, setPosition] = useState(null);
+
+  const map = useMapEvents({
+    click(e) {
+      const { lat, lng } = e.latlng;
+      setPosition([lat, lng]);
+      setLatLng({ lat, lng });
+      reverseGeocode(lat, lng).then(({ fullAddress, simplifiedAddress }) => {
+        setLocation(fullAddress, simplifiedAddress);
+      }).catch(err => console.error('地理編碼錯誤：', err));
+    },
+  });
+
+  return position === null ? null : <Marker position={position} />;
+}
+
+async function reverseGeocode(lat, lng) {
+  try {
+    const response = await axios.get(`http://localhost:3001/geocode?lat=${lat}&lon=${lng}`);
+    const fullAddress = response.data.display_name || '未知地址';
+    const addressParts = fullAddress.split(', ').filter(part => part.trim() !== '中華人民共和國');
+    const simplifiedAddress = addressParts.length >= 2
+      ? `${addressParts[addressParts.length - 4] || ''} ${addressParts[0]}`.trim()
+      : fullAddress;
+    return { fullAddress: addressParts.join(', '), simplifiedAddress };
+  } catch (error) {
+    console.error('逆向地理編碼失敗：', error.message);
+    return { fullAddress: '未知地址', simplifiedAddress: '未知地點' };
+  }
+}
 
 function ReportFound() {
   const [formData, setFormData] = useState({
-    name: '', phoneNumber: '', email: '', isPublic: false, found_date: '', found_location: '', found_details: '', phonePrefix: '+852'
+    petType: '',
+    breed: '',
+    gender: '',
+    age: '',
+    color: '',
+    chipNumber: '',
+    found_date: '',
+    found_location: '',
+    fullAddress: '',
+    displayLocation: '',
+    holding_location: '',
+    contact_name: '',
+    phonePrefix: '+852',
+    phoneNumber: '',
+    email: '',
+    status: '',
+    isPublic: false,
   });
   const [photos, setPhotos] = useState([]);
-  const [map, setMap] = useState(null);
+  const [latLng, setLatLng] = useState(null);
 
-  useEffect(() => {
-    const mapInstance = L.map('map').setView([22.3193, 114.1694], 10); // 預設香港
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(mapInstance);
-    mapInstance.on('click', handleMapClick);
-    setMap(mapInstance);
+  const catBreeds = [
+    { value: 'british_shorthair', label: 'British Shorthair 英國短毛貓' },
+    { value: 'domestick_short_hair_dsh', label: 'Domestic Short Hair (DSH) 家貓 / 唐貓' },
+    { value: 'cross_breed_cat_20220113', label: 'Cross Breed Cat 混血貓' },
+    { value: 'mixed_breed_cat_20220113', label: 'Mixed Breed Cat 混種貓' },
+  ];
 
-    return () => mapInstance.remove(); // 清理
-  }, []);
+  const dogBreeds = [
+    { value: 'miniature_poodle', label: 'Poodle 貴婦犬' },
+    { value: 'japanese_shiba_inu', label: 'Japanese Shiba Inu 柴犬' },
+    { value: 'cross_breed_dog_20220113', label: 'Cross Breed Dog 混血犬' },
+    { value: 'mixed_breed_dog_20220113', label: 'Mixed Breed Dog / Mongrel 混種犬 / 唐狗' },
+  ];
+
+  const petgender = [
+    { value: 'male', label: 'Male 男' },
+    { value: 'female', label: 'Female 女' },
+  ];
+
+  const petage = [
+    { value: 'lt3m', label: '13週以下' },
+    { value: '13w11m', label: '13週至11個月' },
+    { value: '1y', label: '1歲' },
+    { value: '2y', label: '2歲' },
+    { value: '3y', label: '3歲' },
+    { value: '4y', label: '4歲' },
+    { value: '5y', label: '5歲' },
+    { value: '6y', label: '6歲' },
+    { value: '7y', label: '7歲' },
+    { value: '8y', label: '8歲' },
+    { value: '9y', label: '9歲' },
+    { value: '10y', label: '10歲' },
+    { value: '11y', label: '11歲' },
+    { value: '12y', label: '12歲' },
+    { value: '13y', label: '13歲' },
+    { value: '14y', label: '14歲' },
+    { value: 'me15y', label: '15歲或以上' },
+  ];
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handlePhotoChange = (e) => {
     setPhotos([...e.target.files]);
   };
 
-  const handleMapClick = (e) => {
-    const { lat, lng } = e.latlng;
-    const region = (lat >= 22 && lat <= 23 && lng >= 113 && lng <= 115) ? 'HK' : 'TW'; // 簡單判斷
-    setFormData(prev => ({ ...prev, found_location: `${lat},${lng}`, region }));
-    if (map) L.marker([lat, lng]).addTo(map);
+  const handleMapUpdate = (latLngObj) => {
+    setFormData(prev => ({
+      ...prev,
+      found_location: latLngObj ? `${latLngObj.lat},${latLngObj.lng}` : prev.found_location,
+    }));
+    setLatLng(latLngObj);
+  };
+
+  const handleSetLocation = (fullAddress, simplifiedAddress) => {
+    setFormData(prev => ({
+      ...prev,
+      fullAddress: fullAddress || prev.fullAddress,
+      displayLocation: simplifiedAddress || prev.displayLocation,
+    }));
   };
 
   const handleSubmit = (e) => {
@@ -43,11 +142,85 @@ function ReportFound() {
 
     axios.post('http://localhost:3001/api/report-found', formDataToSend)
       .then(res => alert(`報料成功，ID: ${res.data.foundId}`))
-      .catch(err => console.error(err));
+      .catch(err => console.error('提交失敗:', err));
   };
 
   return (
     <form onSubmit={handleSubmit}>
+      <h2>寵物資料</h2>
+      <div>
+        <label>寵物種類：</label>
+        <label>
+          <input type="radio" name="petType" value="cat" checked={formData.petType === 'cat'} onChange={handleChange} /> 貓
+        </label>
+        <label>
+          <input type="radio" name="petType" value="dog" checked={formData.petType === 'dog'} onChange={handleChange} /> 狗
+        </label>
+      </div>
+      <div>
+        <label>品種：</label>
+        <select name="breed" value={formData.breed} onChange={handleChange} disabled={!formData.petType}>
+          <option value="">選擇品種</option>
+          {(formData.petType === 'cat' ? catBreeds : dogBreeds).map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label>性別：</label>
+        <select name="gender" value={formData.gender} onChange={handleChange}>
+          <option value="">選擇性別</option>
+          {petgender.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label>年齡：</label>
+        <select name="age" value={formData.age} onChange={handleChange}>
+          <option value="">選擇年齡</option>
+          {petage.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label>顏色：</label>
+        <input type="text" name="color" placeholder="顏色" onChange={handleChange} required />
+      </div>
+      <div>
+        <label>晶片號碼：</label>
+        <input type="text" name="chipNumber" placeholder="晶片編號" onChange={handleChange} />
+      </div>
+      <div>
+        <label>尋獲地點：</label>
+        <MapContainer center={[22.3193, 114.1694]} zoom={11} style={{ height: '300px', width: '100%', marginTop: '10px' }}>
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          />
+          <LocationMarker setLatLng={handleMapUpdate} setLocation={handleSetLocation} />
+        </MapContainer>
+        <p>地點: {formData.displayLocation || '未選擇'}</p>
+      </div>
+      <div>
+        <label>發現時間：</label>
+        <input type="date" name="found_date" onChange={handleChange} required />
+      </div>
+      <div>
+        <label>受理情形：</label>
+        <input type="text" name="status" placeholder="受理情形" onChange={handleChange} />
+      </div>
+      <div>
+        <label>留置地點：</label>
+        <input type="text" name="holding_location" placeholder="留置地點" onChange={handleChange} />
+      </div>
+
+      <h2>聯絡資料</h2>
+      <div>
+        <label>聯絡人名稱：</label>
+        <input type="text" name="contact_name" placeholder="聯絡人名稱" onChange={handleChange} required />
+      </div>
       <div>
         <label>聯絡電話：</label>
         <select name="phonePrefix" value={formData.phonePrefix} onChange={handleChange}>
@@ -56,18 +229,22 @@ function ReportFound() {
         </select>
         <input type="tel" name="phoneNumber" placeholder="電話號碼" onChange={handleChange} required />
       </div>
-      <div><input type="text" name="name" placeholder="聯絡人名稱" onChange={handleChange} required /></div>
-      <div><input type="email" name="email" placeholder="聯絡電郵" onChange={handleChange} /></div>
-      <div><input type="date" name="found_date" onChange={handleChange} required /></div>
       <div>
-        <label>發現地點：</label>
-        <div id="map" style={{ height: '300px', width: '100%' }}></div>
-        <p>經緯度: {formData.found_location.split(',')[0] || '未選擇'}, {formData.found_location.split(',')[1] || '未選擇'}</p>
+        <label>聯絡電郵：</label>
+        <input type="email" name="email" placeholder="電郵地址" onChange={handleChange} />
       </div>
-      <div><textarea name="found_details" placeholder="發現詳情" onChange={handleChange} maxLength={1000} /></div>
-      <div><input type="file" name="photos" multiple onChange={handlePhotoChange} /></div>
-      <div><label>公開聯繫方式:</label><input type="checkbox" name="isPublic" checked={formData.isPublic} onChange={handleChange} /></div>
+      <div>
+        <label>公開聯繫資料:</label>
+        <input type="checkbox" name="isPublic" checked={formData.isPublic} onChange={handleChange} />
+      </div>
+
+      <div>
+        <label>上傳照片：</label>
+        <input type="file" name="photos" multiple onChange={handlePhotoChange} />
+      </div>
+
       <input type="hidden" name="found_location" value={formData.found_location} />
+      <input type="hidden" name="fullAddress" value={formData.fullAddress} />
       <button type="submit">提交</button>
     </form>
   );

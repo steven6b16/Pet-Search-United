@@ -22,26 +22,33 @@ const db = new sqlite3.Database('./lost_pets.db', (err) => {
 });
 
 db.serialize(() => {
+  console.log('CREATE TABLE IF NOT EXISTS lost_pets');
   db.run(`
     CREATE TABLE IF NOT EXISTS lost_pets (
       lostId TEXT PRIMARY KEY,
-      userId INTEGER,
+      userId INTEGER DEFAULT 0,
+      ownername TEXT,
+      phonePrefix TEXT,
+      phoneNumber INTEGER DEFAULT 0,
+      email TEXT,
       name TEXT,
-      species TEXT,
       breed TEXT,
+      petType TEXT,
       gender TEXT,
-      age TEXT,              -- 改為 TEXT
+      age TEXT, -- 改為 TEXT
       color TEXT,
       lost_date TEXT,
       location TEXT,
       details TEXT,
       chipNumber TEXT,
       photos TEXT,
-      fullAddress TEXT,      -- 新增
-      displayLocation TEXT,  -- 新增
-      region TEXT,           -- 新增
+      fullAddress TEXT, -- 新增
+      displayLocation TEXT, -- 新增
+      region TEXT, -- 新增
       createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       isPublic BOOLEAN DEFAULT 0,
+      isFound BOOLEAN DEFAULT 0,
+      isDeleted BOOLEAN DEFAULT 0,
       FOREIGN KEY (userId) REFERENCES users(userId)
     )
   `);
@@ -123,23 +130,25 @@ app.post('/api/report-lost', upload.array('photos', 5), async (req, res) => {
   console.log('接收到的 req.body:', req.body);
   try {
     const {
-      ownername, phonePrefix, phoneNumber, email,
-      name, species, breed, gender, age, color, lost_date, location, details, chipNumber,
-      fullAddress, displayLocation, region = 'HK', isPublic
+      userId, ownername, phonePrefix, phoneNumber, email, name, breed, petType,
+      gender, age, color, lost_date, location, details, chipNumber, fullAddress,
+       displayLocation, createdAt, isFound, isDeleted, region = 'HK', isPublic
     } = req.body;
     const photos = req.files.map(file => file.path).join(',');
     const lostId = await generateId('lost', region);
-    const isPublicValue = isPublic === 'true' || isPublic === 1 ? 1 : 0; // 新增這行
+    //const isPublicValue = isPublic === 'true' || isPublic === 1 ? 1 : 0; // 新增這行
 
     const stmt = db.prepare(`
       INSERT INTO lost_pets (
-        lostId, userId, name, species, breed, gender, age, color, lost_date, location,
-        details, chipNumber, photos, fullAddress, displayLocation, region, isPublic
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        lostId, userId, ownername, phonePrefix, phoneNumber, email, name, breed, petType,
+         gender, age, color, lost_date, location, details, chipNumber, photos, fullAddress,
+          displayLocation, region, createdAt, isPublic, isFound, isDeleted
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ,?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
-      lostId, userId, name, species, breed, gender, age, color, lost_date, location,
-      details, chipNumber, photos, fullAddress, displayLocation, region, isPublicValue,
+      lostId, userId, ownername, phonePrefix, phoneNumber, email, name, breed, petType,
+      gender, age, color, lost_date, location, details, chipNumber, photos, fullAddress,
+       displayLocation, region, createdAt, isPublic, isFound, isDeleted,
       (err) => {
         if (err) {
           console.error('插入數據失敗:', err);
