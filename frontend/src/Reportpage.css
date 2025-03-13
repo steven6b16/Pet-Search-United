@@ -1,0 +1,111 @@
+.custom-form {
+  background: linear-gradient(135deg, #e0f7fa, #b2ebf2);
+  border-radius: 15px;
+  padding: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.form-card {
+  background: white;
+  border-radius: 10px;
+  padding: 15px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.custom-button {
+  background: #00c4cc;
+  color: white;
+  border-radius: 20px;
+  padding: 10px 20px;
+  border: none;
+  cursor: pointer;
+}
+
+.custom-button:hover {
+  background: #00a1a7;
+}
+
+.icon-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #00c4cc;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  margin-right: 10px;
+}
+
+.map-container {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.field {
+  margin-bottom: 15px;
+}
+
+.label {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 5px;
+  display: block;
+}
+
+.control {
+  margin-bottom: 10px;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  box-sizing: border-box;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: #00c4cc;
+  outline: none;
+  box-shadow: 0 0 5px rgba(0, 196, 204, 0.5);
+}
+
+.is-flex {
+  display: flex;
+  align-items: center;
+}
+
+.ml-2 {
+  margin-left: 10px;
+}
+
+.radio {
+  margin-right: 15px;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+}
+
+.help {
+  font-size: 0.9rem;
+  color: #666;
+  margin-top: 5px;
+}
+
+.is-danger {
+  color: #dc3545;
+}
+
+hr {
+  border: 0;
+  height: 1px;
+  background: #eee;
+  margin: 20px 0;
+}
