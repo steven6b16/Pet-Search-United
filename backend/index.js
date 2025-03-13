@@ -35,16 +35,18 @@ db.serialize(() => {
       breed TEXT,
       petType TEXT,
       gender TEXT,
-      age TEXT, -- 改為 TEXT
+      age TEXT,
       color TEXT,
       lost_date TEXT,
       location TEXT,
       details TEXT,
       chipNumber TEXT,
-      photos TEXT,
-      fullAddress TEXT, -- 新增
-      displayLocation TEXT, -- 新增
-      region TEXT, -- 新增
+      frontPhoto TEXT,          -- 新增正面相字段
+      sidePhoto TEXT,           -- 新增側面相字段
+      otherPhotos TEXT,         -- 新增其他相片字段
+      fullAddress TEXT,
+      displayLocation TEXT,
+      region TEXT,
       createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       isPublic BOOLEAN DEFAULT 0,
       isFound BOOLEAN DEFAULT 0,
@@ -52,18 +54,29 @@ db.serialize(() => {
       FOREIGN KEY (userId) REFERENCES users(userId)
     )
   `);
+
+  // 檢查並添加新字段（如果表已存在）
   db.all("PRAGMA table_info(lost_pets)", (err, rows) => {
     if (err) console.error('檢查 lost_pets 表結構失敗:', err);
     else {
-      const hasIsPublic = rows.some(row => row.name === 'isPublic');
-      if (!hasIsPublic) {
-        db.run(`ALTER TABLE lost_pets ADD COLUMN isPublic BOOLEAN DEFAULT 0`);
-        console.log('為 lost_pets 添加 isPublic 欄位');
-      } else {
-        console.log('lost_pets 已有 isPublic 欄位，跳過');
-      }
+      const fieldsToAdd = [
+        { name: 'frontPhoto', sql: 'ALTER TABLE lost_pets ADD COLUMN frontPhoto TEXT' },
+        { name: 'sidePhoto', sql: 'ALTER TABLE lost_pets ADD COLUMN sidePhoto TEXT' },
+        { name: 'otherPhotos', sql: 'ALTER TABLE lost_pets ADD COLUMN otherPhotos TEXT' },
+        { name: 'isPublic', sql: 'ALTER TABLE lost_pets ADD COLUMN isPublic BOOLEAN DEFAULT 0' },
+      ];
+      fieldsToAdd.forEach(field => {
+        const exists = rows.some(row => row.name === field.name);
+        if (!exists) {
+          db.run(field.sql);
+          console.log(`為 lost_pets 添加 ${field.name} 欄位`);
+        } else {
+          console.log(`lost_pets 已有 ${field.name} 欄位，跳過`);
+        }
+      });
     }
   });
+
   db.run(`
     CREATE TABLE IF NOT EXISTS found_pets (
       foundId TEXT PRIMARY KEY,
@@ -77,6 +90,7 @@ db.serialize(() => {
       createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
   db.all("PRAGMA table_info(found_pets)", (err, rows) => {
     if (err) console.error('檢查 found_pets 表結構失敗:', err);
     else {
@@ -109,10 +123,17 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// 配置 multer 上傳字段（最多 7 張：1 正面 + 1 側面 + 5 其他）
+const uploadFields = upload.fields([
+  { name: 'frontPhoto', maxCount: 1 },
+  { name: 'sidePhoto', maxCount: 1 },
+  { name: 'otherPhotos', maxCount: 5 },
+]);
+
 function generateId(type, region) {
   return new Promise((resolve, reject) => {
     const yearMonth = new Date().toISOString().slice(0, 7).replace('-', '');
-    console.log(`生成 ${type} ID，region: ${region}`); // 添加日志
+    console.log(`生成 ${type} ID，region: ${region}`);
     db.get(`SELECT COUNT(*) as count FROM ${type}_pets WHERE ${type}Id LIKE ?`, [`${region}-${type}${yearMonth}%`], (err, row) => {
       if (err) {
         console.error('生成 ID 失敗:', err);
@@ -120,35 +141,40 @@ function generateId(type, region) {
       }
       const caseNum = (row.count + 1).toString().padStart(2, '0');
       const id = `${region}-${type}${yearMonth}${caseNum}`;
-      console.log(`生成的 ${type}Id: ${id}`); // 添加日志
+      console.log(`生成的 ${type}Id: ${id}`);
       resolve(id);
     });
   });
 }
 
-app.post('/api/report-lost', upload.array('photos', 5), async (req, res) => {
+app.post('/api/report-lost', uploadFields, async (req, res) => {
   console.log('接收到的 req.body:', req.body);
+  console.log('接收到的 req.files:', req.files);
   try {
     const {
       userId, ownername, phonePrefix, phoneNumber, email, name, breed, petType,
       gender, age, color, lost_date, location, details, chipNumber, fullAddress,
-       displayLocation, createdAt, isFound, isDeleted, region = 'HK', isPublic
+      displayLocation, region = 'HK', isPublic, isFound, isDeleted
     } = req.body;
-    const photos = req.files.map(file => file.path).join(',');
+
+    // 處理照片
+    const frontPhoto = req.files['frontPhoto'] ? req.files['frontPhoto'][0].path : null;
+    const sidePhoto = req.files['sidePhoto'] ? req.files['sidePhoto'][0].path : null;
+    const otherPhotos = req.files['otherPhotos'] ? req.files['otherPhotos'].map(file => file.path).join(',') : null;
+
     const lostId = await generateId('lost', region);
-    //const isPublicValue = isPublic === 'true' || isPublic === 1 ? 1 : 0; // 新增這行
 
     const stmt = db.prepare(`
       INSERT INTO lost_pets (
         lostId, userId, ownername, phonePrefix, phoneNumber, email, name, breed, petType,
-         gender, age, color, lost_date, location, details, chipNumber, photos, fullAddress,
-          displayLocation, region, createdAt, isPublic, isFound, isDeleted
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ,?, ?, ?, ?, ?, ?, ?)
+        gender, age, color, lost_date, location, details, chipNumber, frontPhoto, sidePhoto,
+        otherPhotos, fullAddress, displayLocation, region, isPublic, isFound, isDeleted
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       lostId, userId, ownername, phonePrefix, phoneNumber, email, name, breed, petType,
-      gender, age, color, lost_date, location, details, chipNumber, photos, fullAddress,
-       displayLocation, region, createdAt, isPublic, isFound, isDeleted,
+      gender, age, color, lost_date, location, details, chipNumber, frontPhoto, sidePhoto,
+      otherPhotos, fullAddress, displayLocation, region, isPublic ? 1 : 0, isFound, isDeleted,
       (err) => {
         if (err) {
           console.error('插入數據失敗:', err);
@@ -164,6 +190,7 @@ app.post('/api/report-lost', upload.array('photos', 5), async (req, res) => {
   }
 });
 
+// 以下保持不變
 app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
   try {
     const { name, phoneNumber, email, isPublic, found_date, found_location, found_details, region = 'HK' } = req.body;
@@ -266,7 +293,7 @@ app.get('/geocode', async (req, res) => {
   try {
     const response = await axios.get(
       `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`,
-      { headers: { 'User-Agent': 'PetSearchUnited/1.0 (steven6b16@gmail.com)' } } // 確保使用真實 email
+      { headers: { 'User-Agent': 'PetSearchUnited/1.0 (steven6b16@gmail.com)' } }
     );
     res.json(response.data);
   } catch (error) {

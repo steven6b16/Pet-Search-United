@@ -75,7 +75,9 @@ function ReportLost() {
     isFound: false,
     isDeleted: false,
   });
-  const [photos, setPhotos] = useState([]);
+  const [frontPhoto, setFrontPhoto] = useState(null); // 正面相
+  const [sidePhoto, setSidePhoto] = useState(null);   // 側面相
+  const [otherPhotos, setOtherPhotos] = useState([]); // 其他相片
   const [latLng, setLatLng] = useState(null);
   const [photoError, setPhotoError] = useState('');
 
@@ -84,38 +86,64 @@ function ReportLost() {
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  const handlePhotoChange = async (e) => {
+  const handleFrontPhotoChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFrontPhoto(file);
+      setPhotoError('');
+      await processPhoto(file);
+    }
+  };
+
+  const handleSidePhotoChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSidePhoto(file);
+      setPhotoError('');
+      await processPhoto(file);
+    }
+  };
+
+  const handleOtherPhotosChange = async (e) => {
     const files = [...e.target.files];
-    setPhotos(files);
+    if (files.length > 5) {
+      setPhotoError('其他相片最多只能上傳 5 張');
+      e.target.value = '';
+      return;
+    }
+    setOtherPhotos(files);
     setPhotoError('');
-
     if (files.length > 0) {
-      const formData = new FormData();
-      formData.append('image', files[0]);
+      await processPhoto(files[0]); // 只處理第一張進行寵物檢測
+    }
+  };
 
-      try {
-        const response = await axios.post('http://127.0.0.1:5001/upload', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        const { has_pet, message } = response.data;
-        if (has_pet) {
-          const petType = message.toLowerCase().includes('cat') ? 'cat' : 'dog';
-          setFormData(prev => ({ ...prev, petType }));
-          console.log('檢測結果：', message);
-        } else {
-          setFormData(prev => ({ ...prev, petType: '' }));
-          console.log('無寵物檢測到：', message);
-          setPhotoError('圖片檢測失敗，請選擇其他圖片');
-          setPhotos([]);
-          setFormData(prev => ({ ...prev, petType: '' }));
-          e.target.value = "";
-        }
-      } catch (error) {
-        setPhotoError('圖片檢測失敗，請選擇其他圖片');
-        setPhotos([]);
+  const processPhoto = async (file) => {
+    const photoFormData = new FormData();
+    photoFormData.append('image', file);
+
+    try {
+      const response = await axios.post('http://127.0.0.1:5001/upload', photoFormData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const { has_pet, message } = response.data;
+      if (has_pet) {
+        const petType = message.toLowerCase().includes('cat') ? 'cat' : 'dog';
+        setFormData(prev => ({ ...prev, petType }));
+        console.log('檢測結果：', message);
+      } else {
         setFormData(prev => ({ ...prev, petType: '' }));
-        e.target.value = "";
+        console.log('無寵物檢測到：', message);
+        setPhotoError('圖片檢測失敗，請選擇其他圖片');
+        setFrontPhoto(null);
+        setSidePhoto(null);
+        setOtherPhotos([]);
       }
+    } catch (error) {
+      setPhotoError('圖片檢測失敗，請選擇其他圖片');
+      setFrontPhoto(null);
+      setSidePhoto(null);
+      setOtherPhotos([]);
     }
   };
 
@@ -150,7 +178,9 @@ function ReportLost() {
     console.log('提交前 formData:', formData);
     const formDataToSend = new FormData();
     for (let key in formData) formDataToSend.append(key, formData[key]);
-    photos.forEach(photo => formDataToSend.append('photos', photo));
+    if (frontPhoto) formDataToSend.append('frontPhoto', frontPhoto);
+    if (sidePhoto) formDataToSend.append('sidePhoto', sidePhoto);
+    otherPhotos.forEach(photo => formDataToSend.append('otherPhotos', photo));
 
     axios.post('http://localhost:3001/api/report-lost', formDataToSend)
       .then(res => alert(`報失成功，ID: ${res.data.lostId}`))
@@ -268,7 +298,6 @@ function ReportLost() {
 
               <div className="field">
                 <label className="label">性別</label>
-
                 <div className="control">
                   <label className="radio mr-4">
                     <input
@@ -309,8 +338,6 @@ function ReportLost() {
                   </div>
                 </div>
               </div>
-
-              
 
               <div className="field">
                 <label className="label">年齡</label>
@@ -395,16 +422,51 @@ function ReportLost() {
                 </div>
               </div>
 
+              {/* 新增：正面相 */}
               <div className="field">
-                <label className="label">上傳照片</label>
+                <label className="label">寵物正面相（1 張）</label>
                 <div className="control">
                   <input
                     className="input"
                     type="file"
-                    name="photos"
-                    multiple
-                    onChange={handlePhotoChange}
+                    name="frontPhoto"
+                    accept="image/*"
+                    onChange={handleFrontPhotoChange}
                   />
+                  {frontPhoto && <p className="help">已選擇: {frontPhoto.name}</p>}
+                </div>
+              </div>
+
+              {/* 新增：側面相 */}
+              <div className="field">
+                <label className="label">寵物側面相（1 張）</label>
+                <div className="control">
+                  <input
+                    className="input"
+                    type="file"
+                    name="sidePhoto"
+                    accept="image/*"
+                    onChange={handleSidePhotoChange}
+                  />
+                  {sidePhoto && <p className="help">已選擇: {sidePhoto.name}</p>}
+                </div>
+              </div>
+
+              {/* 新增：其他相片 */}
+              <div className="field">
+                <label className="label">其他相片（最多 5 張）</label>
+                <div className="control">
+                  <input
+                    className="input"
+                    type="file"
+                    name="otherPhotos"
+                    multiple
+                    accept="image/*"
+                    onChange={handleOtherPhotosChange}
+                  />
+                  {otherPhotos.length > 0 && (
+                    <p className="help">已選擇: {otherPhotos.length} 張</p>
+                  )}
                   {photoError && <p className="help is-danger">{photoError}</p>}
                 </div>
               </div>

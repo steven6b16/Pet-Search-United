@@ -1,75 +1,131 @@
-.pet-detail-container {
-    background: linear-gradient(135deg, #e0f7fa, #b2ebf2);
-    padding: 20px;
-    border-radius: 15px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    margin: 20px auto;
-    max-width: 100%;
-  }
-  .lost-icon {
-    background: #fff3e0;
-    border-radius: 10px;
-    padding: 10px;
-    display: inline-block;
-    margin-bottom: 10px;
-    font-weight: bold;
-    color: #ff9800;
-  }
-  .pet-info-section {
-    background: #f9f9f9;
-    border-radius: 10px;
-    padding: 15px;
-    margin-bottom: 20px;
-  }
-  .pet-info-section h2 {
-    color: #00c4cc;
-    font-size: 1.5rem;
-    margin-bottom: 10px;
-  }
-  .pet-info-section p {
-    margin: 5px 0;
-    color: #666;
-  }
-  .pet-info-section p strong {
-    color: #333;
-    display: inline-block;
-    width: 100px;
-  }
-  .contact-section {
-    background: #f9f9f9;
-    border-radius: 10px;
-    padding: 15px;
-  }
-  .contact-section h2 {
-    color: #00c4cc;
-    font-size: 1.5rem;
-    margin-bottom: 10px;
-  }
-  .contact-section p {
-    margin: 5px 0;
-    color: #666;
-  }
-  .contact-section p strong {
-    color: #333;
-    display: inline-block;
-    width: 100px;
-  }
-  .contact-button {
-    background: #4caf50;
-    color: white;
-    border-radius: 20px;
-    padding: 8px 15px;
-    border: none;
-    text-decoration: none;
-    margin-right: 10px;
-    display: inline-block;
-    margin-top: 10px;
-  }
-  .contact-button:hover {
-    background: #45a049;
-  }
-  .gallery-container {
-    border-radius: 10px;
-    overflow: hidden;
-    margin-bottom: 20px;
-  }
+/* One Degree 風格：簡潔、現代、專業 */
+.pet-detail-section {
+  padding: 40px 0;
+  background-color: #f5f6f5; /* 柔和灰背景 */
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.title {
+  font-size: 2.5rem;
+  color: #003087; /* One Degree 的藍色 */
+  margin-bottom: 30px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.subtitle {
+  font-size: 1.75rem;
+  color: #003087;
+  margin-bottom: 20px;
+  font-weight: 600;
+}
+
+/* 照片展示 */
+.gallery-container {
+  margin-bottom: 40px;
+}
+
+.custom-gallery .image-gallery-slide img {
+  max-height: 500px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.custom-gallery .image-gallery-thumbnail {
+  border: 2px solid #e0e0e0;
+  border-radius: 4px;
+  transition: border-color 0.3s;
+}
+
+.custom-gallery .image-gallery-thumbnail.active,
+.custom-gallery .image-gallery-thumbnail:hover {
+  border-color: #003087;
+}
+
+.image-gallery-description {
+  color: #333;
+  font-size: 1rem;
+  padding: 5px 0;
+}
+
+.no-photos {
+  text-align: center;
+  color: #666;
+  font-size: 1.2rem;
+}
+
+/* 資訊卡片 */
+.info-card,
+.contact-card {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 25px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  margin-bottom: 30px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 15px;
+}
+
+.info-grid p {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #333;
+}
+
+.info-grid p strong {
+  color: #003087;
+  font-weight: 600;
+}
+
+.details {
+  grid-column: span 2; /* 詳情佔據整行 */
+}
+
+/* 聯絡資料 */
+.contact-links {
+  margin-top: 20px;
+  display: flex;
+  gap: 15px;
+}
+
+.contact-button {
+  display: inline-block;
+  padding: 10px 20px;
+  background-color: #003087;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 25px;
+  font-size: 1rem;
+  transition: background-color 0.3s;
+}
+
+.contact-button:hover {
+  background-color: #0056d2;
+}
+
+.contact-button.whatsapp {
+  background-color: #25d366;
+}
+
+.contact-button.whatsapp:hover {
+  background-color: #20b958;
+}
+
+/* 加載中樣式 */
+.loading {
+  text-align: center;
+  font-size: 1.5rem;
+  color: #666;
+  padding: 50px;
+}
