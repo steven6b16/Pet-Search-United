@@ -235,3 +235,16 @@ form button[type="button"] {
   width: 100%;
   border-radius: 10px;
 }
+
+/* Login / Register MODAL */
+.modal, .modal-card {
+  z-index: 9999; /* 確保 modal 喺所有元素之上 */
+}
+
+.modal-background {
+  z-index: 9998; /* 背景略低於 modal 內容，但高於其他元素 */
+}
+
+.navbar.is-fixed-top {
+  z-index: 30; /* Bulma 預設值，確保 modal 喺導航欄之上 */
+}

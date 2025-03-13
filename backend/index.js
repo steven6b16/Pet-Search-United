@@ -1,10 +1,12 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken'); // 新增 JWT
 const multer = require('multer');
 const path = require('path');
 const cors = require('cors');
 const axios = require('axios');
+const crypto = require('crypto'); // 用於生成隨機 token
 const app = express();
 const port = 3001;
 
@@ -20,6 +22,9 @@ const db = new sqlite3.Database('./lost_pets.db', (err) => {
   }
   console.log('數據庫連接成功');
 });
+
+// JWT 秘鑰（實際應用中應放喺 .env 文件）
+const JWT_SECRET = 'your-secret-key-please-change-this';
 
 db.serialize(() => {
   console.log('CREATE TABLE IF NOT EXISTS lost_pets');
@@ -143,6 +148,154 @@ const uploadFields = upload.fields([
   { name: 'sidePhoto', maxCount: 1 },
   { name: 'otherPhotos', maxCount: 5 },
 ]);
+
+// 生成隨機 token（用於驗證同重置密碼）
+const generateToken = () => crypto.randomBytes(32).toString('hex');
+
+// 註冊 API
+app.post('/api/register', async (req, res) => {
+  const { name, phoneNumber, email, password } = req.body;
+  if (!name || (!phoneNumber && !email) || !password) {
+    return res.status(400).json({ error: '請填寫所有必填字段' });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const verificationToken = generateToken();
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 小時過期
+
+    const stmt = db.prepare(`
+      INSERT INTO users (name, phoneNumber, email, password, verificationToken, verificationExpires)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    stmt.run(name, phoneNumber || null, email || null, hashedPassword, verificationToken, verificationExpires, (err) => {
+      if (err) {
+        console.error('註冊失敗:', err);
+        return res.status(500).json({ error: '註冊失敗，可能電話或電郵已存在' });
+      }
+      // 模擬電郵驗證（實際應發送電郵）
+      console.log(`驗證鏈接: http://localhost:3001/api/verify?token=${verificationToken}`);
+      res.status(201).json({ message: '註冊成功，請檢查電郵進行驗證' });
+    });
+    stmt.finalize();
+  } catch (err) {
+    console.error('註冊錯誤:', err);
+    res.status(500).json({ error: '服務器錯誤' });
+  }
+});
+
+// 驗證電郵 API
+app.get('/api/verify', (req, res) => {
+  const { token } = req.query;
+  db.get('SELECT * FROM users WHERE verificationToken = ? AND verificationExpires > ?', [token, new Date()], (err, row) => {
+    if (err || !row) {
+      return res.status(400).json({ error: '驗證鏈接無效或已過期' });
+    }
+    db.run('UPDATE users SET isVerified = TRUE, status = "active", verificationToken = NULL, verificationExpires = NULL WHERE userId = ?', [row.userId], (err) => {
+      if (err) {
+        return res.status(500).json({ error: '驗證失敗' });
+      }
+      res.json({ message: '電郵驗證成功，請登入' });
+    });
+  });
+});
+
+// 登入 API
+app.post('/api/login', (req, res) => {
+  const { identifier, password } = req.body; // identifier 可以是 phoneNumber 或 email
+  if (!identifier || !password) {
+    return res.status(400).json({ error: '請輸入電話/電郵同密碼' });
+  }
+
+  db.get('SELECT * FROM users WHERE (phoneNumber = ? OR email = ?) AND isDeleted = FALSE', [identifier, identifier], async (err, user) => {
+    if (err || !user) {
+      return res.status(401).json({ error: '用戶不存在' });
+    }
+    if (!user.isVerified) {
+      return res.status(403).json({ error: '請先驗證電郵' });
+    }
+    if (user.status !== 'active') {
+      return res.status(403).json({ error: '帳戶未啟用' });
+    }
+
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      db.run('UPDATE users SET failedLoginAttempts = failedLoginAttempts + 1 WHERE userId = ?', [user.userId]);
+      return res.status(401).json({ error: '密碼錯誤' });
+    }
+
+    const token = jwt.sign({ userId: user.userId }, JWT_SECRET, { expiresIn: '1h' });
+    db.run('UPDATE users SET lastLoginAt = CURRENT_TIMESTAMP, failedLoginAttempts = 0 WHERE userId = ?', [user.userId]);
+    res.json({ token, user: { userId: user.userId, name: user.name, phoneNumber: user.phoneNumber, email: user.email } });
+  });
+});
+
+// 獲取當前用戶資料 API（需認證）
+app.get('/api/me', (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ error: '請先登入' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    db.get('SELECT userId, name, phoneNumber, email FROM users WHERE userId = ? AND isDeleted = FALSE', [decoded.userId], (err, user) => {
+      if (err || !user) {
+        return res.status(404).json({ error: '用戶不存在' });
+      }
+      res.json(user);
+    });
+  } catch (err) {
+    res.status(401).json({ error: '無效嘅 token' });
+  }
+});
+
+// 忘記密碼 API
+app.post('/api/forgot-password', (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: '請輸入電郵' });
+  }
+
+  db.get('SELECT * FROM users WHERE email = ? AND isDeleted = FALSE', [email], (err, user) => {
+    if (err || !user) {
+      return res.status(404).json({ error: '電郵不存在' });
+    }
+
+    const resetToken = generateToken();
+    const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 小時過期
+    db.run('UPDATE users SET resetPasswordToken = ?, resetPasswordExpires = ? WHERE userId = ?', [resetToken, resetExpires, user.userId], (err) => {
+      if (err) {
+        return res.status(500).json({ error: '服務器錯誤' });
+      }
+      // 模擬電郵發送
+      console.log(`重置密碼鏈接: http://localhost:3001/api/reset-password?token=${resetToken}`);
+      res.json({ message: '已發送重置密碼電郵' });
+    });
+  });
+});
+
+// 重置密碼 API
+app.post('/api/reset-password', async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) {
+    return res.status(400).json({ error: '請提供 token 同新密碼' });
+  }
+
+  db.get('SELECT * FROM users WHERE resetPasswordToken = ? AND resetPasswordExpires > ?', [token, new Date()], async (err, user) => {
+    if (err || !user) {
+      return res.status(400).json({ error: '重置鏈接無效或已過期' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    db.run('UPDATE users SET password = ?, resetPasswordToken = NULL, resetPasswordExpires = NULL WHERE userId = ?', [hashedPassword, user.userId], (err) => {
+      if (err) {
+        return res.status(500).json({ error: '重置密碼失敗' });
+      }
+      res.json({ message: '密碼重置成功，請重新登入' });
+    });
+  });
+});
 
 function generateId(type, region) {
   return new Promise((resolve, reject) => {
