@@ -1,4 +1,4 @@
-start cmd.exe /c cd E:
-%cd%\backend
+start cmd.exe /c E:
+cd %cd%\backend
  
 node index.js

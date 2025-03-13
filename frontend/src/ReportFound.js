@@ -3,6 +3,7 @@ import axios from 'axios';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { catBreeds, dogBreeds, petage } from './constants/PetConstants';
 
 // 使用本地圖標（假設圖標文件在 public 目錄下）
 const defaultIcon = L.icon({
@@ -70,45 +71,6 @@ function ReportFound() {
   const [photos, setPhotos] = useState([]);
   const [latLng, setLatLng] = useState(null);
 
-  const catBreeds = [
-    { value: 'british_shorthair', label: 'British Shorthair 英國短毛貓' },
-    { value: 'domestick_short_hair_dsh', label: 'Domestic Short Hair (DSH) 家貓 / 唐貓' },
-    { value: 'cross_breed_cat_20220113', label: 'Cross Breed Cat 混血貓' },
-    { value: 'mixed_breed_cat_20220113', label: 'Mixed Breed Cat 混種貓' },
-  ];
-
-  const dogBreeds = [
-    { value: 'miniature_poodle', label: 'Poodle 貴婦犬' },
-    { value: 'japanese_shiba_inu', label: 'Japanese Shiba Inu 柴犬' },
-    { value: 'cross_breed_dog_20220113', label: 'Cross Breed Dog 混血犬' },
-    { value: 'mixed_breed_dog_20220113', label: 'Mixed Breed Dog / Mongrel 混種犬 / 唐狗' },
-  ];
-
-  const petgender = [
-    { value: 'male', label: 'Male 男' },
-    { value: 'female', label: 'Female 女' },
-  ];
-
-  const petage = [
-    { value: 'lt3m', label: '13週以下' },
-    { value: '13w11m', label: '13週至11個月' },
-    { value: '1y', label: '1歲' },
-    { value: '2y', label: '2歲' },
-    { value: '3y', label: '3歲' },
-    { value: '4y', label: '4歲' },
-    { value: '5y', label: '5歲' },
-    { value: '6y', label: '6歲' },
-    { value: '7y', label: '7歲' },
-    { value: '8y', label: '8歲' },
-    { value: '9y', label: '9歲' },
-    { value: '10y', label: '10歲' },
-    { value: '11y', label: '11歲' },
-    { value: '12y', label: '12歲' },
-    { value: '13y', label: '13歲' },
-    { value: '14y', label: '14歲' },
-    { value: 'me15y', label: '15歲或以上' },
-  ];
-
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
@@ -166,15 +128,30 @@ function ReportFound() {
           ))}
         </select>
       </div>
-      <div>
-        <label>性別：</label>
-        <select name="gender" value={formData.gender} onChange={handleChange}>
-          <option value="">選擇性別</option>
-          {petgender.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-      </div>
+      <div className="field">
+                <label className="label">性別</label>
+
+                <div className="control">
+                  <label className="radio mr-4">
+                    <input
+                      type="radio"
+                      name="gender"
+                      value="male"
+                      checked={formData.gender === 'male'}
+                      onChange={handleChange}
+                    /> 公
+                  </label>
+                  <label className="radio">
+                    <input
+                      type="radio"
+                      name="gender"
+                      value="female"
+                      checked={formData.gender === 'female'}
+                      onChange={handleChange}
+                    /> 母
+                  </label>
+                </div>
+              </div>
       <div>
         <label>年齡：</label>
         <select name="age" value={formData.age} onChange={handleChange}>
@@ -215,7 +192,7 @@ function ReportFound() {
         <label>留置地點：</label>
         <input type="text" name="holding_location" placeholder="留置地點" onChange={handleChange} />
       </div>
-
+<hr></hr>
       <h2>聯絡資料</h2>
       <div>
         <label>聯絡人名稱：</label>

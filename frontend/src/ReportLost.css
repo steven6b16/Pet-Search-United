@@ -1,0 +1,39 @@
+.custom-form {
+    background: linear-gradient(135deg, #e0f7fa, #b2ebf2);
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  .form-card {
+    background: white;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  .custom-button {
+    background: #00c4cc;
+    color: white;
+    border-radius: 20px;
+    padding: 10px 20px;
+    border: none;
+    cursor: pointer;
+  }
+  .custom-button:hover {
+    background: #00a1a7;
+  }
+  .icon-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #00c4cc;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    margin-right: 10px;
+  }
+  .map-container {
+    border-radius: 10px;
+    overflow: hidden;
+  }

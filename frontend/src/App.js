@@ -38,7 +38,7 @@ function App() {
         <nav className="navbar is-fixed-top has-background-light" role="navigation" aria-label="main navigation">
           <div className="navbar-brand">
             <div className="navbar-item">
-              <h1 className="title is-4 has-text-pet-purple">PetBacker</h1>
+              <h1 className="title is-4 has-text-pet-purple">同搜毛棄 Pet Search United</h1>
             </div>
           </div>
           <div className="navbar-menu">
