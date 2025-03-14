@@ -1,88 +1,13 @@
-.App {
-  text-align: center;
-  font-family: Arial, sans-serif;
-}
-.app-header {
-  background-color: #282c34;
-  color: white;
-  padding: 20px;
-}
-.pet-list {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 20px;
-}
-.pet-card {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 15px;
-  width: 250px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-}
-.pet-image {
-  max-width: 100%;
-  height: auto;
-  border-radius: 5px;
-}
-.map-container {
-  height: 400px;
-  width: 100%;
-  margin-top: 20px;
-}
-.search-section {
-  margin: 20px 0;
-}
-.search-input, .category-select {
-  padding: 8px;
-  margin: 0 10px;
-  border-radius: 5px;
-  border: 1px solid #ccc;
-}
-.report-button {
-  display: inline-block;
-  padding: 10px 20px;
-  background-color: #61dafb;
-  color: black;
-  text-decoration: none;
-  border-radius: 5px;
-  margin-top: 10px;
-}
-form div {
-  margin: 10px 0;
-}
-form label {
-  display: inline-block;
-  width: 100px;
-  text-align: right;
-  margin-right: 10px;
-}
-form input, form select, form button {
-  padding: 8px;
-  border-radius: 5px;
-  border: 1px solid #ccc;
-}
-form button[type="submit"] {
-  background-color: #61dafb;
-  border: none;
-  cursor: pointer;
-  padding: 10px 20px;
-}
-form button[type="button"] {
-  background-color: #ddd;
-  border: none;
-  cursor: pointer;
-  padding: 8px 15px;
-  margin-left: 10px;
-}
-
-/* App.css */
-
-/* 整體容器 */
-.container {
+/* 整體佈局與字體 */
+body {
+  margin: 0;
+  padding: 0;
   font-family: 'Arial, sans-serif';
   background-color: #E6F7FA;
   min-height: 100vh;
+}
+
+.container {
   padding: 0;
   margin: 0;
 }
@@ -95,6 +20,10 @@ form button[type="button"] {
   background-color: #fff;
   padding: 10px 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 30;
 }
 
 .logo {
@@ -136,6 +65,7 @@ form button[type="button"] {
   padding: 15px 20px;
   background-color: #fff;
   border-bottom: 1px solid #ddd;
+  margin-top: 60px; /* 避免被導航欄遮擋 */
 }
 
 .mainButton {
@@ -236,15 +166,149 @@ form button[type="button"] {
   border-radius: 10px;
 }
 
-/* Login / Register MODAL */
-.modal, .modal-card {
-  z-index: 9999; /* 確保 modal 喺所有元素之上 */
+/* 表單與輸入框 */
+form div {
+  margin: 10px 0;
+}
+
+form label {
+  display: inline-block;
+  width: 100px;
+  text-align: right;
+  margin-right: 10px;
+}
+
+form input,
+form select,
+form button {
+  padding: 8px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+form button[type="submit"] {
+  background-color: #61dafb;
+  border: none;
+  cursor: pointer;
+  padding: 10px 20px;
+}
+
+form button[type="button"] {
+  background-color: #ddd;
+  border: none;
+  cursor: pointer;
+  padding: 8px 15px;
+  margin-left: 10px;
+}
+
+.search-section {
+  margin: 20px 0;
+}
+
+.search-input,
+.category-select {
+  padding: 8px;
+  margin: 0 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+/* 電話欄位樣式 */
+.field.has-addons {
+  display: flex;
+  align-items: center;
+}
+
+.field.has-addons .control.is-expanded {
+  flex-grow: 1;
+}
+
+.field.has-addons .select select {
+  border-radius: 4px 0 0 4px;
+}
+
+.field.has-addons .input {
+  border-radius: 0 4px 4px 0;
+}
+
+/* Modal 樣式 */
+.modal,
+.modal-card {
+  z-index: 9999;
 }
 
 .modal-background {
-  z-index: 9998; /* 背景略低於 modal 內容，但高於其他元素 */
+  z-index: 9998;
 }
 
-.navbar.is-fixed-top {
-  z-index: 30; /* Bulma 預設值，確保 modal 喺導航欄之上 */
+.modal-card-body .field {
+  margin-bottom: 1.5rem;
+}
+
+.modal-card-body .label {
+  font-weight: bold;
+}
+
+.modal-card-foot .button {
+  margin-right: 0.5rem;
+}
+
+.modal-card {
+  border-radius: 10px;
+}
+
+.modal-card-head {
+  border-bottom: none;
+  padding: 20px;
+}
+
+.modal-card-body {
+  padding: 20px;
+}
+
+.modal-card-foot {
+  border-top: none;
+  padding: 20px;
+  justify-content: flex-end;
+}
+
+/* Tabs 樣式 */
+.tabs.is-boxed li.is-active a {
+  background-color: #00c4cc;
+  color: #00c4cc;
+}
+
+.tabs.is-boxed a {
+  border: 1px solid #dbdbdb;
+  border-bottom: none;
+  color: #00c4cc;
+}
+
+/* 禁用樣式 */
+.input[disabled],
+.button.is-primary[disabled] {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.button.is-primary[disabled] {
+  border-color: #ccc;
+  color: #00c4cc;
+}
+
+/* 隱藏欄位 */
+.is-hidden {
+  display: none !important;
+}
+
+/* 自訂按鈕樣式 */
+.register-button {
+  background-color: #00C4B4 !important;
+  color: white !important;
+}
+
+.cancel-button {
+  background-color: white !important;
+  color: #333 !important;
+  border: 1px solid #dbdbdb !important;
 }

@@ -154,26 +154,33 @@ const generateToken = () => crypto.randomBytes(32).toString('hex');
 
 // 註冊 API
 app.post('/api/register', async (req, res) => {
-  const { name, phoneNumber, email, password } = req.body;
-  if (!name || (!phoneNumber && !email) || !password) {
-    return res.status(400).json({ error: '請填寫所有必填字段' });
+  const { phoneNumber, email, password } = req.body;
+
+  // 驗證邏輯
+  if (phoneNumber && email) {
+    return res.status(400).json({ error: '請只提供電話或電郵其中一個' });
+  }
+  if (!phoneNumber && !email) {
+    return res.status(400).json({ error: '請提供電話或電郵' });
+  }
+  if (!password) {
+    return res.status(400).json({ error: '請提供密碼' });
   }
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
     const verificationToken = generateToken();
-    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 小時過期
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     const stmt = db.prepare(`
-      INSERT INTO users (name, phoneNumber, email, password, verificationToken, verificationExpires)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO users (phoneNumber, email, password, verificationToken, verificationExpires)
+      VALUES (?, ?, ?, ?, ?)
     `);
-    stmt.run(name, phoneNumber || null, email || null, hashedPassword, verificationToken, verificationExpires, (err) => {
+    stmt.run(phoneNumber || null, email || null, hashedPassword, verificationToken, verificationExpires, (err) => {
       if (err) {
         console.error('註冊失敗:', err);
         return res.status(500).json({ error: '註冊失敗，可能電話或電郵已存在' });
       }
-      // 模擬電郵驗證（實際應發送電郵）
       console.log(`驗證鏈接: http://localhost:3001/api/verify?token=${verificationToken}`);
       res.status(201).json({ message: '註冊成功，請檢查電郵進行驗證' });
     });
