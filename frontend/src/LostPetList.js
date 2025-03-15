@@ -303,47 +303,25 @@ function LostPetList() {
                   <div className="card-content">
                     <p className="title is-5">{pet.name}</p>
                     <div className="content">
+                    <p>
+                        <strong class="tag is-primary is-light">性別 / 動物類別:</strong> {pet.gender === 'male' ? '公' : pet.gender === 'female' ? '母' : '未知'} / {pet.petType === 'cat' ? '貓' : 'dog' ? '狗' : '未知'}
+                    </p>
+                    <p>
+                      <strong class="tag is-primary is-light">毛色:</strong> {pet.color || '未知'}
+                    </p>
+                    <p>
+                    <strong class="tag is-primary is-light">品種:</strong> {pet.breed || '未知'}
+                    </p> 
                       <p>
-                        <strong>ID:</strong> {pet.lostId}
+                        <strong class="tag is-primary is-light">遺失日期:</strong> {pet.lost_date}
                       </p>
                       <p>
-                        <strong>種類:</strong> {pet.petType === 'cat' ? '貓' : 'dog' ? '狗' : '未知'}
+                        
                       </p>
                       <p>
-                        <strong>品種:</strong> {pet.breed || '未知'}
+                        <strong class="tag is-primary is-light">遺失地點:</strong> {pet.displayLocation || '未知'}
                       </p>
-                      <p>
-                        <strong>性別:</strong> {pet.gender === 'male' ? '公' : pet.gender === 'female' ? '母' : '未知'}
-                      </p>
-                      <p>
-                        <strong>年齡:</strong> {pet.age || '未知'}
-                      </p>
-                      <p>
-                        <strong>顏色:</strong> {pet.color || '未知'}
-                      </p>
-                      <p>
-                        <strong>遺失日期:</strong> {pet.lost_date}
-                      </p>
-                      <p>
-                        <strong>地區:</strong> {pet.region || '未知'}
-                      </p>
-                      <p>
-                        <strong>地點:</strong> {pet.displayLocation || '未知'}
-                      </p>
-                      {pet.isPublic === 'true' && (
-                        <>
-                          <p>
-                            <strong>聯絡人:</strong> {pet.ownername}
-                          </p>
-                          <p>
-                            <strong>電話:</strong> {pet.phonePrefix}
-                            {pet.phoneNumber}
-                          </p>
-                          <p>
-                            <strong>電郵:</strong> {pet.email}
-                          </p>
-                        </>
-                      )}
+                      
                     </div>
                     <Link to={`/pet/${pet.lostId}`} className="button is-primary">
                       查看詳情
