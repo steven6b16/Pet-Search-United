@@ -337,6 +337,8 @@ app.post('/api/report-lost', uploadFields, async (req, res) => {
     const otherPhotos = req.files['otherPhotos'] ? req.files['otherPhotos'].map(file => file.path).join(',') : null;
 
     const lostId = await generateId('lost', region);
+    console.log(`生成 ${lostId} ID`);
+
     const stmt = db.prepare(`
       INSERT INTO lost_pets (
         lostId, userId, ownername, phonePrefix, phoneNumber, email, name, breed, petType,
