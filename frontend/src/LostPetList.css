@@ -1,0 +1,61 @@
+/* LostPetList.css */
+
+.box {
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background-color: #fff;
+    padding: 1.5rem;
+  }
+  
+  .columns.is-mobile .column {
+    padding: 0.75rem;
+  }
+  
+  .card {
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease;
+  }
+  
+  .card:hover {
+    transform: translateY(-5px);
+  }
+  
+  .card-image .image {
+    overflow: hidden;
+  }
+  
+  .no-image {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: 1rem;
+  }
+  
+  .content p {
+    margin-bottom: 0.5rem;
+    line-height: 1.5;
+  }
+  
+  .control {
+    margin-bottom: 0px;
+  }
+  
+  .has-text-centered {
+    text-align: center !important;
+  }
+  
+  /* 微調 Checkbox Button 樣式 */
+  
+  .buttons .button input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  
+  .mx-2 {
+    margin-left: 0.5rem;
+    margin-right: 0.5rem;
+  }

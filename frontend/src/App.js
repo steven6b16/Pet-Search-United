@@ -5,6 +5,7 @@ import ReportFound from './ReportFound';
 import PetDetail from './PetDetail';
 import LoginModal from './LoginModal';
 import RegisterModal from './RegisterModal';
+import LostPetList from './LostPetList'; // 新增導入
 import axios from 'axios';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -81,6 +82,7 @@ function App() {
               <Route path="/report-lost" element={<ReportLost />} />
               <Route path="/report-found" element={<ReportFound />} />
               <Route path="/pet/:id" element={<PetDetail />} />
+              <Route path="/lost-pet-list" element={<LostPetList />} /> 
               <Route path="/account" element={
                 user ? (
                   <div className="box">
@@ -97,7 +99,7 @@ function App() {
                 <div>
                   <div className="buttons is-centered mb-6">
                     <Link to="/" className="button is-primary is-medium">同搜報料</Link>
-                    <Link to="/" className="button is-info is-medium">報失列表</Link>
+                    <Link to="/lost-pet-list" className="button is-info is-medium">報失列表</Link>
                     <Link to="/report-lost" className="button is-success is-medium" onClick={() => !user && setIsLoginOpen(true)}>主人報失</Link>
                     <Link to="/report-found" className="button is-warning is-medium" onClick={() => !user && setIsLoginOpen(true)}>我要報料</Link>
                   </div>
