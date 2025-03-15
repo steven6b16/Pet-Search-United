@@ -60,54 +60,36 @@ db.serialize(() => {
     )
   `);
 
-  // 檢查並添加新字段（如果表已存在）
-  db.all("PRAGMA table_info(lost_pets)", (err, rows) => {
-    if (err) console.error('檢查 lost_pets 表結構失敗:', err);
-    else {
-      const fieldsToAdd = [
-        { name: 'frontPhoto', sql: 'ALTER TABLE lost_pets ADD COLUMN frontPhoto TEXT' },
-        { name: 'sidePhoto', sql: 'ALTER TABLE lost_pets ADD COLUMN sidePhoto TEXT' },
-        { name: 'otherPhotos', sql: 'ALTER TABLE lost_pets ADD COLUMN otherPhotos TEXT' },
-        { name: 'isPublic', sql: 'ALTER TABLE lost_pets ADD COLUMN isPublic BOOLEAN DEFAULT 0' },
-      ];
-      fieldsToAdd.forEach(field => {
-        const exists = rows.some(row => row.name === field.name);
-        if (!exists) {
-          db.run(field.sql);
-          console.log(`為 lost_pets 添加 ${field.name} 欄位`);
-        } else {
-          console.log(`lost_pets 已有 ${field.name} 欄位，跳過`);
-        }
-      });
-    }
-  });
-
   db.run(`
     CREATE TABLE IF NOT EXISTS found_pets (
       foundId TEXT PRIMARY KEY,
-      name TEXT,
+      userId INTEGER DEFAULT 0,
+      reportername TEXT,
+      phonePrefix TEXT,
       phoneNumber TEXT,
       email TEXT,
+      breed TEXT,
+      petType TEXT,
+      gender TEXT,
+      age TEXT, -- 改為 TEXT
+      color TEXT,
       found_date TEXT,
       found_location TEXT,
       found_details TEXT,
+      region TEXT, -- 新增
+      chipNumber TEXT,
       photos TEXT,
-      createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      fullAddress TEXT, -- 新增
+      displayLocation TEXT, -- 新增
+      holding_location TEXT, -- 新增
+      status TEXT, -- 新增
+      createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      isPublic BOOLEAN DEFAULT 0,
+      isFound BOOLEAN DEFAULT 0,
+      isDeleted BOOLEAN DEFAULT 0,
+      FOREIGN KEY (userId) REFERENCES users(userId)
     )
   `);
-
-  db.all("PRAGMA table_info(found_pets)", (err, rows) => {
-    if (err) console.error('檢查 found_pets 表結構失敗:', err);
-    else {
-      const hasIsPublic = rows.some(row => row.name === 'isPublic');
-      if (!hasIsPublic) {
-        db.run(`ALTER TABLE found_pets ADD COLUMN isPublic BOOLEAN DEFAULT 0`);
-        console.log('為 found_pets 添加 isPublic 欄位');
-      } else {
-        console.log('found_pets 已有 isPublic 欄位，跳過');
-      }
-    }
-  });
 
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
@@ -133,6 +115,41 @@ db.serialize(() => {
     )
   `);
 });
+
+  // 檢查並添加新字段（如果表已存在）
+  db.all("PRAGMA table_info(lost_pets)", (err, rows) => {
+    if (err) console.error('檢查 lost_pets 表結構失敗:', err);
+    else {
+      const fieldsToAdd = [
+        { name: 'frontPhoto', sql: 'ALTER TABLE lost_pets ADD COLUMN frontPhoto TEXT' },
+        { name: 'sidePhoto', sql: 'ALTER TABLE lost_pets ADD COLUMN sidePhoto TEXT' },
+        { name: 'otherPhotos', sql: 'ALTER TABLE lost_pets ADD COLUMN otherPhotos TEXT' },
+        { name: 'isPublic', sql: 'ALTER TABLE lost_pets ADD COLUMN isPublic BOOLEAN DEFAULT 0' },
+      ];
+      fieldsToAdd.forEach(field => {
+        const exists = rows.some(row => row.name === field.name);
+        if (!exists) {
+          db.run(field.sql);
+          console.log(`為 lost_pets 添加 ${field.name} 欄位`);
+        } else {
+          console.log(`lost_pets 已有 ${field.name} 欄位，跳過`);
+        }
+      });
+    }
+  });
+
+  db.all("PRAGMA table_info(found_pets)", (err, rows) => {
+    if (err) console.error('檢查 found_pets 表結構失敗:', err);
+    else {
+      const hasIsPublic = rows.some(row => row.name === 'isPublic');
+      if (!hasIsPublic) {
+        db.run(`ALTER TABLE found_pets ADD COLUMN isPublic BOOLEAN DEFAULT 0`);
+        console.log('為 found_pets 添加 isPublic 欄位');
+      } else {
+        console.log('found_pets 已有 isPublic 欄位，跳過');
+      }
+    }
+  });
 
 const storage = multer.diskStorage({
   destination: './uploads/',
@@ -369,15 +386,21 @@ app.post('/api/report-lost', uploadFields, async (req, res) => {
 // 以下保持不變
 app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
   try {
-    const { name, phoneNumber, email, isPublic, found_date, found_location, found_details, region = 'HK' } = req.body;
+    const { userId, reportername, phonePrefix, phoneNumber, email, breed, petType, gender,
+      age, color, found_date, found_location, found_details, region, chipNumber, fullAddress,
+      displayLocation, holding_location, status, isPublic, isFound, isDeleted } = req.body;
     const photos = req.files.map(file => file.path).join(',');
     const foundId = await generateId('found', region);
 
     const stmt = db.prepare(`
-      INSERT INTO found_pets (foundId, name, phoneNumber, email, isPublic, found_date, found_location, found_details, photos)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO found_pets (foundId, userId, reportername, phonePrefix, phoneNumber, email, breed, petType, gender,
+      age, color, found_date, found_location, found_details, region, chipNumber, photos, fullAddress,
+      displayLocation, holding_location, status, isPublic, isFound, isDeleted )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    stmt.run(foundId, name, phoneNumber, email, isPublic, found_date, found_location, found_details, photos, (err) => {
+    stmt.run(foundId, userId, reportername, phonePrefix, phoneNumber, email, breed, petType, gender,
+      age, color, found_date, found_location, found_details, region, chipNumber, photos, fullAddress,
+      displayLocation, holding_location, status, isPublic, isFound, isDeleted , (err) => {
       if (err) {
         console.error('插入數據失敗:', err);
         return res.status(500).send('插入數據失敗');

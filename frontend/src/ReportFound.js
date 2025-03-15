@@ -6,7 +6,6 @@ import 'leaflet/dist/leaflet.css';
 import './Reportpage.css';
 import { catBreeds, dogBreeds, petage } from './constants/PetConstants';
 
-
 // 使用本地圖標（假設圖標文件在 public 目錄下）
 const defaultIcon = L.icon({
   iconUrl: '/marker-icon.png',
@@ -52,26 +51,32 @@ async function reverseGeocode(lat, lng) {
 
 function ReportFound() {
   const [formData, setFormData] = useState({
-    petType: '',
-    breed: '',
-    gender: '',
-    age: '',
-    color: '',
-    chipNumber: '',
-    found_date: '',
-    found_location: '',
-    fullAddress: '',
-    displayLocation: '',
-    holding_location: '',
-    contact_name: '',
+    userId: 0,
+    reportername: '',
     phonePrefix: '+852',
     phoneNumber: '',
     email: '',
+    breed: '',
+    petType: '',
+    gender: '',
+    age: '',
+    color: '',
+    found_date: '',
+    found_location: '',
+    found_details: '',
+    region: '',
+    chipNumber: '',
+    fullAddress: '',
+    displayLocation: '',
+    holding_location: '',
     status: '',
     isPublic: false,
+    isFound: false,
+    isDeleted: false,
   });
   const [photos, setPhotos] = useState([]);
   const [latLng, setLatLng] = useState(null);
+  const [geoError, setGeoError] = useState('');
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -79,13 +84,29 @@ function ReportFound() {
   };
 
   const handlePhotoChange = (e) => {
-    setPhotos([...e.target.files]);
+    const selectedFiles = [...e.target.files];
+    if (selectedFiles.length > 5) {
+      alert('最多只能上傳 5 張相片！');
+      setPhotos(selectedFiles.slice(0, 5));
+    } else {
+      setPhotos(selectedFiles);
+    }
   };
 
   const handleMapUpdate = (latLngObj) => {
+    console.log('更新地圖，latLngObj:', latLngObj);
+    const newRegion = latLngObj
+      ? latLngObj.lat >= 22.1 && latLngObj.lat <= 22.6 && latLngObj.lng >= 113.8 && latLngObj.lng <= 114.4
+        ? 'HK'
+        : latLngObj.lat >= 21.9 && latLngObj.lat <= 25.3 && latLngObj.lng >= 120.0 && latLngObj.lng <= 122.0
+        ? 'TW'
+        : 'UNKNOWN'
+      : formData.region;
+    console.log('計算地區:', newRegion);
     setFormData(prev => ({
       ...prev,
-      found_location: latLngObj ? `${latLngObj.lat},${latLngObj.lng}` : prev.found_location,
+      location: latLngObj ? `${latLngObj.lat},${latLngObj.lng}` : prev.location,
+      region: newRegion,
     }));
     setLatLng(latLngObj);
   };
@@ -96,10 +117,24 @@ function ReportFound() {
       fullAddress: fullAddress || prev.fullAddress,
       displayLocation: simplifiedAddress || prev.displayLocation,
     }));
+    setGeoError(''); // 清除錯誤提示
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!formData.petType) {
+      alert('請選擇寵物種類！');
+      return;
+    }
+    if (!formData.breed) {
+      alert('請選擇品種！');
+      return;
+    }
+    if (!formData.found_date) {
+      alert('請選擇發現時間！');
+      return;
+    }
+
     const formDataToSend = new FormData();
     for (let key in formData) formDataToSend.append(key, formData[key]);
     photos.forEach(photo => formDataToSend.append('photos', photo));
@@ -180,13 +215,13 @@ function ReportFound() {
               <div className="field">
                 <label className="label">顏色：</label>
                 <div className="control">
-                  <input className="input" type="text" name="color" placeholder="顏色" onChange={handleChange} required />
+                  <input className="input" type="text" name="color" placeholder="顏色" value={formData.color} onChange={handleChange} required />
                 </div>
               </div>
               <div className="field">
                 <label className="label">晶片號碼：</label>
                 <div className="control">
-                  <input className="input" type="text" name="chipNumber" placeholder="晶片編號" onChange={handleChange} />
+                  <input className="input" type="text" name="chipNumber" placeholder="晶片編號" value={formData.chipNumber} onChange={handleChange} />
                 </div>
               </div>
               <div className="field">
@@ -202,30 +237,50 @@ function ReportFound() {
                     </MapContainer>
                   </div>
                   <p className="help">地點: {formData.displayLocation || '未選擇'}</p>
+                  {geoError && <p className="help is-danger">{geoError}</p>}
                 </div>
               </div>
               <div className="field">
                 <label className="label">發現時間：</label>
                 <div className="control">
-                  <input className="input" type="date" name="found_date" onChange={handleChange} required />
+                  <input className="input" type="date" name="found_date" value={formData.found_date} onChange={handleChange} required />
+                </div>
+              </div>
+              <div className="field">
+                <label className="label">發現詳情：</label>
+                <div className="control">
+                  <textarea
+                    className="textarea"
+                    name="found_details"
+                    placeholder="請描述發現寵物嘅詳情（例如地點、情況等）"
+                    value={formData.found_details}
+                    onChange={handleChange}
+                  />
                 </div>
               </div>
               <div className="field">
                 <label className="label">受理情形：</label>
                 <div className="control">
-                  <input className="input" type="text" name="status" placeholder="受理情形" onChange={handleChange} />
+                  <input className="input" type="text" name="status" placeholder="受理情形" value={formData.status} onChange={handleChange} />
                 </div>
               </div>
               <div className="field">
                 <label className="label">留置地點：</label>
                 <div className="control">
-                  <input className="input" type="text" name="holding_location" placeholder="留置地點" onChange={handleChange} />
+                  <input className="input" type="text" name="holding_location" placeholder="留置地點" value={formData.holding_location} onChange={handleChange} />
                 </div>
               </div>
               <div className="field">
-                <label className="label">上傳照片：</label>
+                <label className="label">上傳照片（最多 5 張）：</label>
                 <div className="control">
-                  <input className="input" type="file" name="photos" multiple onChange={handlePhotoChange} />
+                  <input
+                    className="input"
+                    type="file"
+                    name="photos"
+                    multiple
+                    accept="image/*"
+                    onChange={handlePhotoChange}
+                  />
                 </div>
               </div>
             </div>
@@ -238,7 +293,7 @@ function ReportFound() {
               <div className="field">
                 <label className="label">聯絡人名稱：</label>
                 <div className="control">
-                  <input className="input" type="text" name="contact_name" placeholder="聯絡人名稱" onChange={handleChange} required />
+                  <input className="input" type="text" name="reportername" placeholder="聯絡人名稱" value={formData.reportername} onChange={handleChange} required />
                 </div>
               </div>
               <div className="field">
@@ -250,13 +305,13 @@ function ReportFound() {
                       <option value="+886">台灣 (+886)</option>
                     </select>
                   </div>
-                  <input className="input ml-2" type="tel" name="phoneNumber" placeholder="電話號碼" onChange={handleChange} required />
+                  <input className="input ml-2" type="tel" name="phoneNumber" placeholder="電話號碼" value={formData.phoneNumber} onChange={handleChange} required />
                 </div>
               </div>
               <div className="field">
                 <label className="label">聯絡電郵：</label>
                 <div className="control">
-                  <input className="input" type="email" name="email" placeholder="電郵地址" onChange={handleChange} />
+                  <input className="input" type="email" name="email" placeholder="電郵地址" value={formData.email} onChange={handleChange} />
                 </div>
               </div>
               <div className="field">
@@ -265,7 +320,8 @@ function ReportFound() {
                 </label>
               </div>
             </div>
-
+            
+            <input type="hidden" name="region" value={formData.region} />
             <input type="hidden" name="found_location" value={formData.found_location} />
             <input type="hidden" name="fullAddress" value={formData.fullAddress} />
 

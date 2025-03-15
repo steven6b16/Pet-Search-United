@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import 'bulma/css/bulma.min.css';
 import './LostPetList.css'; // 自定義樣式（用於微調）
 import axios from 'axios';
+import { catBreeds, dogBreeds} from './constants/PetConstants';
 
 function LostPetList() {
   const [pets, setPets] = useState([]);
@@ -362,17 +363,5 @@ function LostPetList() {
     </section>
   );
 }
-
-// 品種常量
-const catBreeds = [
-  { value: 'american_shorthair', label: '美國短毛貓' },
-  { value: 'british_shorthair', label: '英國短毛貓' },
-  { value: 'persian', label: '波斯貓' },
-];
-
-const dogBreeds = [
-  { value: 'golden_retriever', label: '黃金獵犬' },
-  { value: 'poodle', label: '貴賓犬' },
-];
 
 export default LostPetList;
