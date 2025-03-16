@@ -115,7 +115,7 @@ function FoundPetList() {
 
         {/* 導航按鈕組 */}
         <div className="buttons is-centered mb-6">
-          <a className="button is-primary is-medium" href="/found-pet-list" data-discover="true">
+          <a className="button is-primary is-medium" href="/pet-list" data-discover="true">
             同搜報料
           </a>
           <a className="button is-info is-medium" href="/lost-pet-list" data-discover="true">
@@ -297,7 +297,7 @@ function FoundPetList() {
                         發現地點: {pet.displayLocation || '未知'}
                         <br />
                         <br />
-                        <Link to={`/found-pet/${pet.foundId}`}>查看詳情</Link>
+                        <Link to={`/pet/${pet.foundId}`}>查看詳情</Link>
                       </Popup>
                     </Marker>
                   );
@@ -347,7 +347,7 @@ function FoundPetList() {
                         {pet.displayLocation || '未知'}
                       </p>
                     </div>
-                    <Link to={`/found-pet/${pet.foundId}`} className="button is-primary">
+                    <Link to={`/pet/${pet.foundId}`} className="button is-primary">
                       查看詳情
                     </Link>
                   </div>
