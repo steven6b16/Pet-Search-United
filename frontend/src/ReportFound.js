@@ -106,6 +106,7 @@ function ReportFound() {
     setFormData(prev => ({
       ...prev,
       location: latLngObj ? `${latLngObj.lat},${latLngObj.lng}` : prev.location,
+      found_location: latLngObj ? `${latLngObj.lat},${latLngObj.lng}` : prev.found_location, // 新增這行
       region: newRegion,
     }));
     setLatLng(latLngObj);

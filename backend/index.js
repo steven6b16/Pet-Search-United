@@ -627,7 +627,9 @@ app.post('/api/confirm-found-group', async (req, res) => {
   if (!token) return res.status(401).json({ error: '請先登入' });
 
   const { groupId, confirmFoundIds } = req.body;
-  if (!groupId || !confirmFoundIds || !Array.isArray(confirmFoundIds)) return res.status(400).json({ error: '請提供 groupId 同 confirmFoundIds' });
+  if (!groupId || !confirmFoundIds || !Array.isArray(confirmFoundIds)) {
+    return res.status(400).json({ error: '請提供 groupId 同 confirmFoundIds' });
+  }
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
@@ -645,10 +647,12 @@ app.post('/api/confirm-found-group', async (req, res) => {
     const validConfirmIds = confirmFoundIds.filter(id => pendingFoundIds.includes(id));
     if (validConfirmIds.length === 0) return res.status(400).json({ error: '無有效嘅待確認 foundId' });
 
-    const stmt = db.prepare('UPDATE found_pets SET groupId = ? WHERE foundId = ?');
+    // 更新 found_pets 表嘅 groupId
+    const stmt = db.prepare('UPDATE found_pets SET groupId = ? WHERE foundId = ? AND isDeleted = 0');
     validConfirmIds.forEach(foundId => stmt.run(groupId, foundId));
     stmt.finalize();
 
+    // 更新群組狀態
     pendingFoundIds = pendingFoundIds.filter(id => !validConfirmIds.includes(id)).join(',');
     db.run(`
       UPDATE found_pet_groups 
