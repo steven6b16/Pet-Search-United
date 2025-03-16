@@ -576,16 +576,16 @@ app.post('/api/create-found-group', async (req, res) => {
     const userId = decoded.userId;
 
     const [found1Exists, found2Exists] = await Promise.all([
-      new Promise((resolve, reject) => db.get('SELECT foundId, groupId FROM found_pets WHERE foundId = ? AND isDeleted = 0', [foundId1], (err, row) => {
+      new Promise((resolve, reject) => db.get('SELECT foundId, groupId FROM found_pets WHERE foundId = ? AND isDeleted = "false"', [foundId1], (err, row) => {
         if (err) reject(err);
         else resolve(row);
       })),
-      new Promise((resolve, reject) => db.get('SELECT foundId, groupId FROM found_pets WHERE foundId = ? AND isDeleted = 0', [foundId2], (err, row) => {
+      new Promise((resolve, reject) => db.get('SELECT foundId, groupId FROM found_pets WHERE foundId = ? AND isDeleted = "false"', [foundId2], (err, row) => {
         if (err) reject(err);
         else resolve(row);
       })),
     ]);
-    if (!found1Exists || !found2Exists) return res.status(404).json({ error: '記錄不存在' });
+    if (!found1Exists || !found2Exists) return res.status(404).json({ error: '記錄不存在A' });
 
     let groupId = found1Exists.groupId || found2Exists.groupId;
 
@@ -684,7 +684,7 @@ app.post('/api/create-pet-match', async (req, res) => {
         else resolve(!!row);
       })),
     ]);
-    if (!lostExists || !foundExists) return res.status(404).json({ error: '記錄不存在' });
+    if (!lostExists || !foundExists) return res.status(404).json({ error: '記錄不存在1' });
 
     const matchId = `${lostId}-${foundId}-${Date.now()}`;
     const stmt = db.prepare(`

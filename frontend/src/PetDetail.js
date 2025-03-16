@@ -14,19 +14,28 @@ function PetDetail() {
   const [relatedFoundPets, setRelatedFoundPets] = useState([]); // 同一群組嘅報料
   const [matches, setMatches] = useState([]); // 報失同報料嘅匹配
   const [user, setUser] = useState(null);
-  const [linkFoundId, setLinkFoundId] = useState(''); // 用於報料間連結
+  const [linkFoundId, setLinkFoundId] = useState(''); // 用於現有「連結其他報料」
+  const [requestLinkFoundId, setRequestLinkFoundId] = useState(''); // 用於新「要求連結」
+  const [showRequestLinkForm, setShowRequestLinkForm] = useState(false); // 控制輸入框顯示
   const [updateForm, setUpdateForm] = useState({ found_date: '', found_location: '', found_details: '', holding_location: '', status: '' });
-  const [pin, setPin] = useState(''); // 用於 PIN 驗證
+  const [pin, setPin] = useState('');
   const [showUpdateForm, setShowUpdateForm] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
+    console.log('Token:', token); // Debug: 檢查 token
     if (token) {
       axios.get('http://localhost:3001/api/me', { headers: { Authorization: `Bearer ${token}` } })
-        .then(res => setUser(res.data))
-        .catch(() => localStorage.removeItem('token'));
+        .then(res => {
+          setUser(res.data);
+          console.log('User:', res.data); // Debug: 檢查 user
+        })
+        .catch(err => {
+          console.error('Get user failed:', err);
+          localStorage.removeItem('token');
+        });
     }
-  
+
     const fetchPet = async () => {
       try {
         let petData;
@@ -36,18 +45,15 @@ function PetDetail() {
           petData = await axios.get(`http://localhost:3001/api/found-pets/${id}`);
         }
         setPet(petData.data);
+        console.log('Pet data:', petData.data); // Debug: 檢查 pet 數據
         parseCoordinates(petData.data);
-  
-        // 移除 /api/matches 嘅請求，因為後端無實現
-        // const matchesData = await axios.get(`http://localhost:3001/api/matches?petId=${id}`);
-        // setMatches(matchesData.data);
-  
-        // 如果係報料，獲取同一群組嘅其他報料
+
         if (petData.data.foundId && petData.data.groupId) {
           const related = await axios.get(`http://localhost:3001/api/found-pets?groupId=${petData.data.groupId}`);
           setRelatedFoundPets(related.data.filter(p => p.foundId !== id));
         }
       } catch (err) {
+        console.error('Fetch pet failed:', err);
         setPet(null);
       }
     };
@@ -57,12 +63,29 @@ function PetDetail() {
   const parseCoordinates = (petData) => {
     const location = petData.location || petData.found_location;
     if (location) {
-      const [lat, lng] = location.split(',').map(coord => parseFloat(coord.trim()));
-      if (!isNaN(lat) && !isNaN(lng)) setCoordinates([lat, lng]);
+      const [lat, lng] = location.split(',').map((coord) => parseFloat(coord.trim()));
+      if (!isNaN(lat) && !isNaN(lng)) {
+        setCoordinates([lat, lng]);
+      } else {
+        console.error('無效的坐標格式:', location);
+      }
+    } else {
+      console.warn('寵物數據中無位置信息:', petData);
     }
   };
 
-  // 報料間連結
+  const allPositions = [];
+  if (coordinates) {
+    allPositions.push(coordinates); // 添加當前寵物的坐標
+  }
+
+  if (relatedFoundPets.length > 0) {
+    const relatedPositions = relatedFoundPets
+      .map((p) => (p.found_location || '').split(',').map((coord) => parseFloat(coord.trim())))
+      .filter((pos) => pos.length === 2 && !isNaN(pos[0]) && !isNaN(pos[1]));
+    allPositions.push(...relatedPositions);
+  }
+  
   const handleLinkFoundPets = async () => {
     if (!linkFoundId) return alert('請輸入要連結的 foundId');
     const token = localStorage.getItem('token');
@@ -77,7 +100,22 @@ function PetDetail() {
     }
   };
 
-  // 報料更新
+  const handleRequestLink = async () => {
+    if (!requestLinkFoundId) return alert('請輸入要要求連結的 foundId');
+    const token = localStorage.getItem('token');
+    if (!token) return alert('請先登入');
+    try {
+      const res = await axios.post('http://localhost:3001/api/create-found-group', { foundId1: pet.foundId, foundId2: requestLinkFoundId }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      alert(res.data.message);
+      setRequestLinkFoundId('');
+      setShowRequestLinkForm(false);
+    } catch (err) {
+      alert(err.response?.data?.error || '要求連結失敗');
+    }
+  };
+
   const handleUpdateFoundPet = async () => {
     const token = localStorage.getItem('token');
     try {
@@ -87,7 +125,6 @@ function PetDetail() {
       alert('報料已更新');
       setShowUpdateForm(false);
       setPin('');
-      // 刷新頁面數據
       const updatedPet = await axios.get(`http://localhost:3001/api/found-pets/${pet.foundId}`);
       setPet(updatedPet.data);
     } catch (err) {
@@ -95,7 +132,6 @@ function PetDetail() {
     }
   };
 
-  // 報失同報料匹配
   const handleCreateMatch = async () => {
     const token = localStorage.getItem('token');
     if (!linkFoundId) return alert('請輸入要匹配的 ID');
@@ -150,7 +186,6 @@ function PetDetail() {
 
   const isLostPet = !!pet.lostId;
 
-  // 獲取所有報料嘅位置（用於地圖折線）
   const allFoundPets = pet.foundId ? [pet, ...relatedFoundPets] : [];
   const positions = allFoundPets
     .map(p => (p.found_location || '').split(',').map(coord => parseFloat(coord.trim())))
@@ -209,20 +244,87 @@ function PetDetail() {
         </div>
 
         {/* 地圖展示（包含折線） */}
-        {positions.length > 0 && (
+        {coordinates && (
           <div className="card">
-            <h2 className="subtitle">發現地點</h2>
-            <MapContainer center={positions[0]} zoom={13} style={{ height: '300px', width: '100%' }}>
-              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' />
-              {allFoundPets.map((p, idx) => (
-                <Marker key={p.foundId} position={positions[idx]}>
-                  <Popup><b>{p.foundId}</b><br />{p.found_date}</Popup>
-                </Marker>
-              ))}
-              {positions.length > 1 && <Polyline positions={positions} color="blue" />}
+           <h2 className="subtitle">{isLostPet ? '遺失地點' : '發現地點'}</h2>
+            <MapContainer center={coordinates} zoom={13} style={{ height: '300px', width: '100%' }}>
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              />
+              {/* 當前寵物位置 */}
+              <Marker position={coordinates}>
+                <Popup>
+                  <b>{pet.lostId || pet.foundId}</b>
+                  <br />
+                  {isLostPet ? `遺失日期: ${pet.lost_date}` : `發現日期: ${pet.found_date}`}
+                  <br />
+                  {pet.displayLocation || pet.location || pet.found_location || '未知'}
+                </Popup>
+              </Marker>
+              {/* 相關報料寵物位置 */}
+              {pet.foundId &&
+                relatedFoundPets.map((p, idx) => {
+                  const pos = (p.found_location || '').split(',').map((coord) => parseFloat(coord.trim()));
+                  if (pos.length === 2 && !isNaN(pos[0]) && !isNaN(pos[1])) {
+                    return (
+                      <Marker key={p.foundId} position={pos}>
+                        <Popup>
+                          <b>{p.foundId}</b>
+                          <br />
+                          {p.found_date}
+                        </Popup>
+                      </Marker>
+                    );
+                  }
+                  return null;
+                })}
+              {/* 如果有多個位置，繪製折線 */}
+              {allPositions.length > 1 && <Polyline positions={allPositions} color="blue" />}
             </MapContainer>
           </div>
         )}
+
+        {!coordinates && <p className="has-text-centered">此寵物無可用位置信息</p>}
+
+        {/* 新增 "要求連結" 卡片（始終顯示，僅限 pet 存在時渲染輸入框） */}
+        <div className="card">
+          <h2 className="subtitle">要求連結</h2>
+          <button
+            className="button is-info"
+            onClick={() => setShowRequestLinkForm(true)}
+          >
+            要求連結
+          </button>
+          {pet && showRequestLinkForm && (
+            <div className="field mt-2">
+              <div className="control">
+                <input
+                  className="input"
+                  type="text"
+                  placeholder="輸入要要求連結的 foundId"
+                  value={requestLinkFoundId}
+                  onChange={(e) => setRequestLinkFoundId(e.target.value)}
+                />
+                <button
+                  className="button is-primary mt-2"
+                  onClick={handleRequestLink}
+                >
+                  提交要求
+                </button>
+                <button
+                  className="button is-danger mt-2 ml-2"
+                  onClick={() => {
+                    setRequestLinkFoundId('');
+                    setShowRequestLinkForm(false);
+                  }}
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* 發現軌跡時間線 */}
         {pet.foundId && allFoundPets.length > 0 && (
@@ -239,22 +341,19 @@ function PetDetail() {
               ))}
             </div>
 
-            {/* 報料間連結 */}
-            {!pet.isFound && user && (
-              <div className="field">
-                <label className="label">連結其他報料</label>
-                <div className="control">
-                  <input
-                    className="input"
-                    type="text"
-                    placeholder="輸入要連結的 foundId"
-                    value={linkFoundId}
-                    onChange={(e) => setLinkFoundId(e.target.value)}
-                  />
-                  <button className="button is-primary mt-2" onClick={handleLinkFoundPets}>提交連結</button>
-                </div>
+            <div className="field">
+              <label className="label">連結其他報料</label>
+              <div className="control">
+                <input
+                  className="input"
+                  type="text"
+                  placeholder="輸入要連結的 foundId"
+                  value={linkFoundId}
+                  onChange={(e) => setLinkFoundId(e.target.value)}
+                />
+                <button className="button is-primary mt-2" onClick={handleLinkFoundPets}>提交連結</button>
               </div>
-            )}
+            </div>
           </div>
         )}
 
@@ -275,7 +374,7 @@ function PetDetail() {
             ))}
           </div>
 
-          {!pet.isFound && user && (
+          {user && (
             <div className="field">
               <label className="label">匹配報失/報料</label>
               <div className="control">
@@ -293,7 +392,7 @@ function PetDetail() {
         </div>
 
         {/* 報料更新 */}
-        {pet.foundId && user && !pet.isFound && (
+        {pet.foundId && user && (
           <div className="card">
             <h2 className="subtitle">更新報料</h2>
             <button className="button is-info" onClick={() => setShowUpdateForm(!showUpdateForm)}>
