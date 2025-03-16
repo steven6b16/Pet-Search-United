@@ -6,8 +6,9 @@ import PetDetail from './PetDetail';
 import LoginModal from './LoginModal';
 import RegisterModal from './RegisterModal';
 import LostPetList from './LostPetList'; // 新增導入
+import FoundPetList from './FoundPetList';
 import axios from 'axios';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import * as reactLeaflet from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 function App() {
@@ -83,6 +84,7 @@ function App() {
               <Route path="/report-found" element={<ReportFound />} />
               <Route path="/pet/:id" element={<PetDetail />} />
               <Route path="/lost-pet-list" element={<LostPetList />} /> 
+              <Route path="/found-pet-list" element={<FoundPetList/> } />
               <Route path="/account" element={
                 user ? (
                   <div className="box">
@@ -98,32 +100,32 @@ function App() {
               <Route path="/" element={
                 <div>
                   <div className="buttons is-centered mb-6">
-                    <Link to="/" className="button is-primary is-medium">同搜報料</Link>
+                    <Link to="/found-pet-list" className="button is-primary is-medium">同搜報料</Link>
                     <Link to="/lost-pet-list" className="button is-info is-medium">報失列表</Link>
                     <Link to="/report-lost" className="button is-success is-medium" onClick={() => !user && setIsLoginOpen(true)}>主人報失</Link>
                     <Link to="/report-found" className="button is-warning is-medium" onClick={() => !user && setIsLoginOpen(true)}>我要報料</Link>
                   </div>
                   <div className="box mt-6">
                     <h2 className="title is-4 has-text-pet-purple mb-4">寵物地圖</h2>
-                    <MapContainer center={[22.3193, 114.1694]} zoom={10} style={{ height: '450px', width: '100%', borderRadius: '10px' }}>
-                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' />
+                    <reactLeaflet.MapContainer center={[22.3193, 114.1694]} zoom={10} style={{ height: '450px', width: '100%', borderRadius: '10px' }}>
+                      <reactLeaflet.TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' />
                       {lostPets.map(pet => {
                         if (pet.location) {
                           const [lat, lng] = pet.location.split(',').map(coord => parseFloat(coord));
                           if (!isNaN(lat) && !isNaN(lng)) {
                             return (
-                              <Marker key={pet.lostId} position={[lat, lng]}>
-                                <Popup>
+                              <reactLeaflet.Marker key={pet.lostId} position={[lat, lng]}>
+                                <reactLeaflet.Popup>
                                   <b>{pet.name}</b><br />
                                   <a href={`/pet/${pet.lostId}`}>查看詳情</a>
-                                </Popup>
-                              </Marker>
+                                </reactLeaflet.Popup>
+                              </reactLeaflet.Marker>
                             );
                           }
                         }
                         return null;
                       })}
-                    </MapContainer>
+                    </reactLeaflet.MapContainer>
                   </div>
                   <div className="columns">
                     <div className="column is-two-thirds">

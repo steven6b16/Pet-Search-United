@@ -15,7 +15,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-function LostPetList() {
+function FoundPetList() {
   const [pets, setPets] = useState([]);
   const [filteredPets, setFilteredPets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,14 +32,14 @@ function LostPetList() {
   useEffect(() => {
     setLoading(true);
     axios
-      .get('http://localhost:3001/api/lost-pets')
+      .get('http://localhost:3001/api/found-pets')
       .then((res) => {
         setPets(res.data);
         setFilteredPets(res.data);
         setLoading(false);
       })
       .catch((err) => {
-        console.error('獲取走失寵物失敗:', err);
+        console.error('獲取發現寵物失敗:', err);
         setLoading(false);
         setFilteredPets([]);
       });
@@ -50,10 +50,10 @@ function LostPetList() {
 
     if (filters.dateRangeStart || filters.dateRangeEnd) {
       result = result.filter((pet) => {
-        const lostDate = new Date(pet.lost_date);
+        const foundDate = new Date(pet.found_date);
         const start = filters.dateRangeStart ? new Date(filters.dateRangeStart) : null;
         const end = filters.dateRangeEnd ? new Date(filters.dateRangeEnd) : null;
-        return (!start || lostDate >= start) && (!end || lostDate <= end);
+        return (!start || foundDate >= start) && (!end || foundDate <= end);
       });
     }
 
@@ -111,7 +111,7 @@ function LostPetList() {
   return (
     <section className="section lost-pet-list">
       <div className="container">
-        <h1 className="title has-text-centered">走失寵物列表</h1>
+        <h1 className="title has-text-centered">發現寵物列表</h1>
 
         {/* 導航按鈕組 */}
         <div className="buttons is-centered mb-6">
@@ -234,7 +234,7 @@ function LostPetList() {
             </div>
             <div className="column is-6">
               <div className="field">
-                <label className="label">遺失時間範圍</label>
+                <label className="label">發現時間範圍</label>
                 <div className="control">
                   <div className="is-flex is-align-items-center">
                     <input
@@ -279,25 +279,25 @@ function LostPetList() {
               attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             />
             {filteredPets
-              .filter((pet) => pet.location)
+              .filter((pet) => pet.found_location)
               .map((pet) => {
-                const [lat, lng] = pet.location.split(',').map(Number);
+                const [lat, lng] = pet.found_location.split(',').map(Number);
                 if (!isNaN(lat) && !isNaN(lng)) {
                   return (
-                    <Marker key={pet.lostId} position={[lat, lng]}>
+                    <Marker key={pet.foundId} position={[lat, lng]}>
                       <Popup>
-                        <strong>{pet.name}</strong>
+                        <strong>{pet.reportername || '匿名'}</strong>
                         <br />
                         種類/性別:{' '}
                         {pet.petType === 'cat' ? '貓' : pet.petType === 'dog' ? '狗' : '未知'} /{' '}
                         {pet.gender === 'male' ? '公' : pet.gender === 'female' ? '母' : '未知'}
                         <br />
-                        遺失日期: {pet.lost_date}
+                        發現日期: {pet.found_date}
                         <br />
-                        遺失地點: {pet.displayLocation || '未知'}
+                        發現地點: {pet.displayLocation || '未知'}
                         <br />
                         <br />
-                        <Link to={`/pet/${pet.lostId}`}>查看詳情</Link>
+                        <Link to={`/found-pet/${pet.foundId}`}>查看詳情</Link>
                       </Popup>
                     </Marker>
                   );
@@ -307,18 +307,18 @@ function LostPetList() {
           </MapContainer>
         </div>
 
-        {/* 寵物列表 */}
+        {/* Grid 模式顯示 */}
         <div className="columns is-multiline">
           {filteredPets.length > 0 ? (
             filteredPets.map((pet) => (
-              <div key={pet.lostId} className="column is-4">
+              <div key={pet.foundId} className="column is-4">
                 <div className="card">
                   <div className="card-image">
                     <figure className="image is-4by3">
-                      {pet.frontPhoto ? (
+                      {pet.photos ? (
                         <img
-                          src={`http://localhost:3001/${pet.frontPhoto.replace(/\\/g, '/')}`}
-                          alt={`${pet.name} 正面照`}
+                          src={`http://localhost:3001/${pet.photos.split(',')[0].replace(/\\/g, '/')}`}
+                          alt="發現寵物照片"
                         />
                       ) : (
                         <div className="no-image has-background-light has-text-centered">無照片</div>
@@ -326,7 +326,7 @@ function LostPetList() {
                     </figure>
                   </div>
                   <div className="card-content">
-                    <p className="title is-5">{pet.name}</p>
+                    <p className="title is-5">{pet.reportername || '匿名'}</p>
                     <div className="content">
                       <p>
                         <strong className="tag is-primary is-light">種類 / 性別:</strong>{' '}
@@ -340,14 +340,14 @@ function LostPetList() {
                         <strong className="tag is-primary is-light">品種:</strong> {pet.breed || '未知'}
                       </p>
                       <p>
-                        <strong className="tag is-primary is-light">遺失日期:</strong> {pet.lost_date}
+                        <strong className="tag is-primary is-light">發現日期:</strong> {pet.found_date}
                       </p>
                       <p>
-                        <strong className="tag is-primary is-light">遺失地點:</strong>{' '}
+                        <strong className="tag is-primary is-light">發現地點:</strong>{' '}
                         {pet.displayLocation || '未知'}
                       </p>
                     </div>
-                    <Link to={`/pet/${pet.lostId}`} className="button is-primary">
+                    <Link to={`/found-pet/${pet.foundId}`} className="button is-primary">
                       查看詳情
                     </Link>
                   </div>
@@ -356,7 +356,7 @@ function LostPetList() {
             ))
           ) : (
             <div className="column">
-              <p className="has-text-centered">無符合條件的走失寵物</p>
+              <p className="has-text-centered">無符合條件的發現寵物</p>
             </div>
           )}
         </div>
@@ -365,4 +365,4 @@ function LostPetList() {
   );
 }
 
-export default LostPetList;
+export default FoundPetList;

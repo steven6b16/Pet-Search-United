@@ -304,3 +304,27 @@ export const catBreeds = [
     { value: '14y', label: '14歲' },
     { value: 'me15y', label: '15歲或以上' },
   ];
+
+
+// 香港 18 區列表
+export const hongKongDistricts = [
+  { value: '', label: '全部地區' },
+  { value: 'Central and Western', label: '中西區' },
+  { value: 'Eastern', label: '東區' },
+  { value: 'Southern', label: '南區' },
+  { value: 'Wan Chai', label: '灣仔區' },
+  { value: 'Sham Shui Po', label: '深水埗區' },
+  { value: 'Kowloon City', label: '九龍城區' },
+  { value: 'Kwun Tong', label: '觀塘區' },
+  { value: 'Wong Tai Sin', label: '黃大仙區' },
+  { value: 'Yau Tsim Mong', label: '油尖旺區' },
+  { value: 'Islands', label: '離島區' },
+  { value: 'Kwai Tsing', label: '葵青區' },
+  { value: 'North', label: '北區' },
+  { value: 'Sai Kung', label: '西貢區' },
+  { value: 'Sha Tin', label: '沙田區' },
+  { value: 'Tai Po', label: '大埔區' },
+  { value: 'Tsuen Wan', label: '荃灣區' },
+  { value: 'Tuen Mun', label: '屯門區' },
+  { value: 'Yuen Long', label: '元朗區' },
+];
