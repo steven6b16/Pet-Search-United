@@ -203,3 +203,36 @@
   bottom: 20px;
   right: 20px;
 }
+
+.timeline {
+  padding: 1rem;
+}
+
+.timeline-item {
+  border-left: 2px solid #dbdbdb;
+  padding-left: 1rem;
+  margin-bottom: 1rem;
+}
+
+.timeline-item p {
+  margin: 0.5rem 0;
+}
+
+.update-form .field {
+  margin-bottom: 1rem;
+}
+
+.update-form .label {
+  font-weight: bold;
+}
+
+.update-form .input,
+.update-form .textarea {
+  width: 100%;
+}
+
+.button.is-info,
+.button.is-primary,
+.button.is-success {
+  margin-top: 0.5rem;
+}
