@@ -57,10 +57,28 @@ function PetDetail() {
   const parseCoordinates = (petData) => {
     const location = petData.location || petData.found_location;
     if (location) {
-      const [lat, lng] = location.split(',').map(coord => parseFloat(coord.trim()));
-      if (!isNaN(lat) && !isNaN(lng)) setCoordinates([lat, lng]);
+      const [lat, lng] = location.split(',').map((coord) => parseFloat(coord.trim()));
+      if (!isNaN(lat) && !isNaN(lng)) {
+        setCoordinates([lat, lng]);
+      } else {
+        console.error('無效的坐標格式:', location);
+      }
+    } else {
+      console.warn('寵物數據中無位置信息:', petData);
     }
   };
+
+  const allPositions = [];
+  if (coordinates) {
+    allPositions.push(coordinates); // 添加當前寵物的坐標
+  }
+
+  if (relatedFoundPets.length > 0) {
+    const relatedPositions = relatedFoundPets
+      .map((p) => (p.found_location || '').split(',').map((coord) => parseFloat(coord.trim())))
+      .filter((pos) => pos.length === 2 && !isNaN(pos[0]) && !isNaN(pos[1]));
+    allPositions.push(...relatedPositions);
+  }
 
   // 報料間連結
   const handleLinkFoundPets = async () => {
@@ -209,20 +227,48 @@ function PetDetail() {
         </div>
 
         {/* 地圖展示（包含折線） */}
-        {positions.length > 0 && (
+        {coordinates && (
           <div className="card">
-            <h2 className="subtitle">發現地點</h2>
-            <MapContainer center={positions[0]} zoom={13} style={{ height: '300px', width: '100%' }}>
-              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' />
-              {allFoundPets.map((p, idx) => (
-                <Marker key={p.foundId} position={positions[idx]}>
-                  <Popup><b>{p.foundId}</b><br />{p.found_date}</Popup>
-                </Marker>
-              ))}
-              {positions.length > 1 && <Polyline positions={positions} color="blue" />}
+            <h2 className="subtitle">{isLostPet ? '遺失地點' : '發現地點'}</h2>
+            <MapContainer center={coordinates} zoom={13} style={{ height: '300px', width: '100%' }}>
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              />
+              {/* 當前寵物位置 */}
+              <Marker position={coordinates}>
+                <Popup>
+                  <b>{pet.lostId || pet.foundId}</b>
+                  <br />
+                  {isLostPet ? `遺失日期: ${pet.lost_date}` : `發現日期: ${pet.found_date}`}
+                  <br />
+                  {pet.displayLocation || pet.location || pet.found_location || '未知'}
+                </Popup>
+              </Marker>
+              {/* 相關報料寵物位置 */}
+              {pet.foundId &&
+                relatedFoundPets.map((p, idx) => {
+                  const pos = (p.found_location || '').split(',').map((coord) => parseFloat(coord.trim()));
+                  if (pos.length === 2 && !isNaN(pos[0]) && !isNaN(pos[1])) {
+                    return (
+                      <Marker key={p.foundId} position={pos}>
+                        <Popup>
+                          <b>{p.foundId}</b>
+                          <br />
+                          {p.found_date}
+                        </Popup>
+                      </Marker>
+                    );
+                  }
+                  return null;
+                })}
+              {/* 如果有多個位置，繪製折線 */}
+              {allPositions.length > 1 && <Polyline positions={allPositions} color="blue" />}
             </MapContainer>
           </div>
         )}
+
+        {!coordinates && <p className="has-text-centered">此寵物無可用位置信息</p>}
 
         {/* 發現軌跡時間線 */}
         {pet.foundId && allFoundPets.length > 0 && (
