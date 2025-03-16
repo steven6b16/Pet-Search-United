@@ -6,6 +6,7 @@ p{
     padding-left: 0px!important;
     padding-right: 0px!important;
 }
+
 .box {
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -65,3 +66,11 @@ p{
     margin-left: 0.5rem;
     margin-right: 0.5rem;
   }
+
+.lost-pet-list .button.is-info, .lost-pet-list .button.is-primary, .lost-pet-list .button.is-success {
+    margin-top: 0;
+}
+
+.lost-pet-list .control.choice-btns button{
+    width: 45%;
+}
