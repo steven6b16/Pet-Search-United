@@ -7,6 +7,8 @@ import LoginModal from './LoginModal';
 import RegisterModal from './RegisterModal';
 import LostPetList from './LostPetList'; // 新增導入
 import FoundPetList from './FoundPetList';
+import AdminDashboard from './components/AdminDashboard';
+import ProtectedRoute from './components/ProtectedRoute';
 import axios from 'axios';
 import * as reactLeaflet from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -85,6 +87,7 @@ function App() {
               <Route path="/pet/:id" element={<PetDetail />} />
               <Route path="/lost-pet-list" element={<LostPetList />} /> 
               <Route path="/found-pet-list" element={<FoundPetList/> } />
+              <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>}/>
               <Route path="/account" element={
                 user ? (
                   <div className="box">

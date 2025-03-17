@@ -70,9 +70,9 @@ function ReportFound() {
     displayLocation: '',
     holding_location: '',
     status: '',
-    isPublic: false,
-    isFound: false,
-    isDeleted: false,
+    isPublic: 0,
+    isFound: 0,
+    isDeleted: 0,
   });
   const [photos, setPhotos] = useState([]);
   const [latLng, setLatLng] = useState(null);

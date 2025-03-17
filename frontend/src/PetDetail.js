@@ -20,15 +20,16 @@ function PetDetail() {
   const [updateForm, setUpdateForm] = useState({ found_date: '', found_location: '', found_details: '', holding_location: '', status: '' });
   const [pin, setPin] = useState('');
   const [showUpdateForm, setShowUpdateForm] = useState(false);
+  const [pendingFoundIds, setPendingFoundIds] = useState([]);
+  const [selectedPendingIds, setSelectedPendingIds] = useState([]);
+  const [pendingGroupId, setPendingGroupId] = useState(null); // 存儲從 pendingFoundIds 找到的 groupId
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
       axios
         .get('http://localhost:3001/api/me', { headers: { Authorization: `Bearer ${token}` } })
-        .then((res) => {
-          setUser(res.data);
-        })
+        .then((res) => setUser(res.data))
         .catch((err) => {
           console.error('Get user failed:', err);
           localStorage.removeItem('token');
@@ -43,12 +44,31 @@ function PetDetail() {
         } catch {
           petData = await axios.get(`http://localhost:3001/api/found-pets/${id}`);
         }
+        console.log('Pet data:', petData.data);
         setPet(petData.data);
         parseCoordinates(petData.data);
 
-        if (petData.data.foundId && petData.data.groupId) {
-          const related = await axios.get(`http://localhost:3001/api/found-pets?groupId=${petData.data.groupId}`);
-          setRelatedFoundPets(related.data.filter((p) => p.foundId !== id));
+        if (petData.data.foundId) {
+          // 獲取已確認的相關報料
+          if (petData.data.groupId) {
+            const related = await axios.get(`http://localhost:3001/api/found-pets?groupId=${petData.data.groupId}`);
+            const filteredRelated = related.data.filter(
+              (p) => p.foundId !== id && p.groupId === petData.data.groupId
+            );
+            console.log('Fetched related found pets:', related.data);
+            setRelatedFoundPets(filteredRelated);
+          } else {
+            setRelatedFoundPets([]);
+          }
+
+          // 獲取待確認的 pendingFoundIds
+          const pendingData = await axios.get(`http://localhost:3001/api/pending-found-ids/${petData.data.foundId}`);
+          console.log('Pending data:', pendingData.data);
+          setPendingGroupId(pendingData.data.groupId);
+          setPendingFoundIds(pendingData.data.pendingFoundIds);
+        } else {
+          setRelatedFoundPets([]);
+          setPendingFoundIds([]);
         }
       } catch (err) {
         console.error('Fetch pet failed:', err);
@@ -62,31 +82,19 @@ function PetDetail() {
     const location = petData?.location || petData?.found_location;
     if (location) {
       const [lat, lng] = location.split(',').map((coord) => parseFloat(coord.trim()));
-      if (!isNaN(lat) && !isNaN(lng)) {
-        setCoordinates([lat, lng]);
-      }
+      if (!isNaN(lat) && !isNaN(lng)) setCoordinates([lat, lng]);
     }
   };
 
   const getSortedPositions = () => {
     const safePet = pet || {};
     const safeRelatedFoundPets = Array.isArray(relatedFoundPets) ? relatedFoundPets : [];
-
-    // 只處理報料寵物（foundId 存在）
     const allFoundPets = safePet.foundId ? [safePet, ...safeRelatedFoundPets] : safeRelatedFoundPets;
-
-    // 過濾有效數據
     const validPets = allFoundPets.filter((p) => p?.found_date && p?.found_location);
-
     if (validPets.length === 0) return [];
-
-    // 按 found_date 排序
     const sortedPets = validPets.sort((a, b) => new Date(a.found_date) - new Date(b.found_date));
-
-    // 生成坐標並去重
     const positions = [];
     const seenPositions = new Set();
-
     sortedPets.forEach((p) => {
       const [lat, lng] = (p.found_location || '').split(',').map((coord) => parseFloat(coord.trim()));
       if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
@@ -97,7 +105,6 @@ function PetDetail() {
         }
       }
     });
-
     return positions;
   };
 
@@ -114,29 +121,11 @@ function PetDetail() {
       );
       alert(res.data.message);
       setLinkFoundId('');
-      // 重新載入相關報料
-      const related = await axios.get(`http://localhost:3001/api/found-pets?groupId=${pet.groupId}`);
-      setRelatedFoundPets(related.data.filter((p) => p.foundId !== id));
+      const pendingData = await axios.get(`http://localhost:3001/api/pending-found-ids/${pet.foundId}`);
+      setPendingGroupId(pendingData.data.groupId);
+      setPendingFoundIds(pendingData.data.pendingFoundIds);
     } catch (err) {
       alert(err.response?.data?.error || '創建連結失敗');
-    }
-  };
-
-  const handleRequestLink = async () => {
-    if (!requestLinkFoundId) return alert('請輸入要要求連結的 foundId');
-    const token = localStorage.getItem('token');
-    if (!token) return alert('請先登入');
-    try {
-      const res = await axios.post(
-        'http://localhost:3001/api/create-found-group',
-        { foundId1: pet.foundId, foundId2: requestLinkFoundId },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      alert(res.data.message);
-      setRequestLinkFoundId('');
-      setShowRequestLinkForm(false);
-    } catch (err) {
-      alert(err.response?.data?.error || '要求連結失敗');
     }
   };
 
@@ -196,18 +185,33 @@ function PetDetail() {
   const handleConfirmLink = async () => {
     const token = localStorage.getItem('token');
     if (!token) return alert('請先登入');
-    const groupId = pet.groupId || `GROUP${Date.now()}`; // 假設 groupId 已存在或新生成
+    if (!pendingGroupId) return alert('當前報料無待確認群組，請先提交連結');
+    if (selectedPendingIds.length === 0) return alert('請選擇至少一個要確認的報料');
+
     try {
       const res = await axios.post(
         'http://localhost:3001/api/confirm-found-group',
-        { groupId, confirmFoundIds: [pet.foundId, linkFoundId] },
+        { groupId: pendingGroupId, confirmFoundIds: selectedPendingIds },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       alert(res.data.message);
-      setRelatedFoundPets(await axios.get(`http://localhost:3001/api/found-pets?groupId=${groupId}`).then(res => res.data));
+      const related = await axios.get(`http://localhost:3001/api/found-pets?groupId=${pendingGroupId}`);
+      setRelatedFoundPets(related.data.filter((p) => p.foundId !== id && p.groupId === pendingGroupId));
+      const pendingData = await axios.get(`http://localhost:3001/api/pending-found-ids/${pet.foundId}`);
+      setPendingGroupId(pendingData.data.groupId);
+      setPendingFoundIds(pendingData.data.pendingFoundIds);
+      setSelectedPendingIds([]);
+      const updatedPet = await axios.get(`http://localhost:3001/api/found-pets/${id}`);
+      setPet(updatedPet.data); // 更新 pet 以反映新的 groupId
     } catch (err) {
       alert(err.response?.data?.error || '確認失敗');
     }
+  };
+
+  const togglePendingIdSelection = (foundId) => {
+    setSelectedPendingIds((prev) =>
+      prev.includes(foundId) ? prev.filter((id) => id !== foundId) : [...prev, foundId]
+    );
   };
 
   if (!pet) return <div className="loading">加載中...</div>;
@@ -237,7 +241,7 @@ function PetDetail() {
   return (
     <section className="pet-detail-section">
       <div className="container">
-        <h1 className="title">{pet.name} 詳細信息</h1>
+        <h1 className="title">{pet.name || '未知名稱'} 詳細信息</h1>
         <div className="detail-layout">
           <div className="gallery-container">
             {images.length > 0 ? (
@@ -252,10 +256,10 @@ function PetDetail() {
               <h2 className="subtitle">寵物資料</h2>
               <div className="info-grid">
                 <p><strong>ID:</strong> {pet.lostId || pet.foundId}</p>
-                <p><strong>名稱:</strong> {pet.name}</p>
+                <p><strong>名稱:</strong> {pet.name || '未知'}</p>
                 {isLostPet && (
                   <>
-                    <p><strong>種類:</strong> {pet.petType === 'cat' ? '貓' : pet.petType === 'dog' ? '狗' : pet.petType}</p>
+                    <p><strong>種類:</strong> {pet.petType === 'cat' ? '貓' : pet.petType === 'dog' ? '狗' : pet.petType || '未知'}</p>
                     <p><strong>品種:</strong> {pet.breed || '未知'}</p>
                     <p><strong>性別:</strong> {pet.gender === 'male' ? '男' : pet.gender === 'female' ? '女' : pet.gender || '未知'}</p>
                     <p><strong>年齡:</strong> {pet.age || '未知'}</p>
@@ -263,7 +267,7 @@ function PetDetail() {
                     <p><strong>晶片號碼:</strong> {pet.chipNumber || '無'}</p>
                   </>
                 )}
-                <p><strong>日期:</strong> {pet.lost_date || pet.found_date}</p>
+                <p><strong>日期:</strong> {pet.lost_date || pet.found_date || '未知'}</p>
                 <p><strong>地點:</strong> {pet.displayLocation || pet.location || pet.found_location || '未知'}</p>
                 <p className="details"><strong>詳情:</strong> {pet.details || pet.found_details || '無'}</p>
               </div>
@@ -273,13 +277,17 @@ function PetDetail() {
               <div className="card contact-card">
                 <h2 className="subtitle">聯絡資料</h2>
                 <div className="info-grid">
-                  <p><strong>聯絡人:</strong> {pet.ownername || pet.reportername}</p>
-                  <p><strong>電話:</strong> {pet.phoneNumber}</p>
-                  <p><strong>電郵:</strong> {pet.email}</p>
+                  <p><strong>聯絡人:</strong> {pet.ownername || pet.reportername || '未知'}</p>
+                  <p><strong>電話:</strong> {pet.phoneNumber || '無'}</p>
+                  <p><strong>電郵:</strong> {pet.email || '無'}</p>
                 </div>
                 <div className="contact-links">
-                  <a href={`tel:${pet.phoneNumber}`} className="button is-primary">電話聯絡</a>
-                  <a href={`https://wa.me/${pet.phoneNumber}`} target="_blank" rel="noopener noreferrer" className="button is-success">WhatsApp</a>
+                  {pet.phoneNumber && (
+                    <>
+                      <a href={`tel:${pet.phoneNumber}`} className="button is-primary">電話聯絡</a>
+                      <a href={`https://wa.me/${pet.phoneNumber}`} target="_blank" rel="noopener noreferrer" className="button is-success">WhatsApp</a>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -327,41 +335,6 @@ function PetDetail() {
         )}
         {!coordinates && <p className="has-text-centered">此寵物無可用位置信息</p>}
 
-        {/* 要求連結 */}
-        {pet?.foundId && (
-          <div className="card">
-            <h2 className="subtitle">要求連結</h2>
-            <button className="button is-info" onClick={() => setShowRequestLinkForm(true)}>
-              要求連結
-            </button>
-            {showRequestLinkForm && (
-              <div className="field mt-2">
-                <div className="control">
-                  <input
-                    className="input"
-                    type="text"
-                    placeholder="輸入要要求連結的 foundId"
-                    value={requestLinkFoundId}
-                    onChange={(e) => setRequestLinkFoundId(e.target.value)}
-                  />
-                  <button className="button is-primary mt-2" onClick={handleRequestLink}>
-                    提交要求
-                  </button>
-                  <button
-                    className="button is-danger mt-2 ml-2"
-                    onClick={() => {
-                      setRequestLinkFoundId('');
-                      setShowRequestLinkForm(false);
-                    }}
-                  >
-                    取消
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* 發現軌跡時間線 */}
         {pet?.foundId && allPositions.length > 0 && (
           <div className="card">
@@ -373,7 +346,7 @@ function PetDetail() {
                   <div key={p.foundId} className="timeline-item">
                     <p><strong>報料 ID:</strong> <a href={`/pet/${p.foundId}`}>{p.foundId}</a></p>
                     <p><strong>發現時間:</strong> {new Date(p.found_date).toLocaleString()}</p>
-                    <p><strong>地點:</strong> {p.displayLocation || p.found_location}</p>
+                    <p><strong>地點:</strong> {p.displayLocation || p.found_location || '未知'}</p>
                     <p><strong>詳情:</strong> {p.found_details || '無'}</p>
                   </div>
                 ))}
@@ -391,12 +364,32 @@ function PetDetail() {
                 <button className="button is-primary mt-2" onClick={handleLinkFoundPets}>提交連結</button>
               </div>
             </div>
+            {/* 確認連結 */}
             {pet?.foundId && (
               <div className="card">
                 <h2 className="subtitle">確認連結</h2>
-                <button className="button is-success" onClick={handleConfirmLink}>
-                  確認連結
-                </button>
+                {pendingFoundIds.length > 0 ? (
+                  <div>
+                    <p>待確認的報料：</p>
+                    {pendingFoundIds.map((foundId) => (
+                      <div key={foundId} className="field">
+                        <label className="checkbox">
+                          <input
+                            type="checkbox"
+                            checked={selectedPendingIds.includes(foundId)}
+                            onChange={() => togglePendingIdSelection(foundId)}
+                          />
+                          {foundId}
+                        </label>
+                      </div>
+                    ))}
+                    <button className="button is-success mt-2" onClick={handleConfirmLink}>
+                      確認所選連結
+                    </button>
+                  </div>
+                ) : (
+                  <p>目前無待確認的報料</p>
+                )}
               </div>
             )}
           </div>

@@ -26,6 +26,24 @@ const db = new sqlite3.Database('./lost_pets.db', (err) => {
 // JWT 秘鑰（實際應用中應放喺 .env 文件）
 const JWT_SECRET = 'your-secret-key-please-change-this';
 
+const isAdmin = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ error: '請先登入' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.role !== 'admin') {
+      return res.status(403).json({ error: '需要管理員權限' });
+    }
+    req.user = decoded; // 將解碼後的用戶信息傳下去
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: '無效嘅 token' });
+  }
+};
+
 db.serialize(() => {
   console.log('CREATE TABLE IF NOT EXISTS lost_pets');
   db.run(`
@@ -113,6 +131,7 @@ db.serialize(() => {
       modifiedBy TEXT,
       createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       modifiedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      role TEXT DEFAULT 'user',
       isDeleted BOOLEAN DEFAULT FALSE,
       deletedAt TIMESTAMP
     )
@@ -292,9 +311,24 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: '密碼錯誤' });
     }
 
-    const token = jwt.sign({ userId: user.userId }, JWT_SECRET, { expiresIn: '1h' });
+    // 修改這部分，加入 role
+    const token = jwt.sign(
+      { userId: user.userId, role: user.role }, // 添加 role
+      JWT_SECRET,
+      { expiresIn: '1h' }
+    );
     db.run('UPDATE users SET lastLoginAt = CURRENT_TIMESTAMP, failedLoginAttempts = 0 WHERE userId = ?', [user.userId]);
-    res.json({ token, user: { userId: user.userId, name: user.name, phoneNumber: user.phoneNumber, email: user.email } });
+    // 順便把 role 加到回應中，方便前端使用
+    res.json({ 
+      token, 
+      user: { 
+        userId: user.userId, 
+        name: user.name, 
+        phoneNumber: user.phoneNumber, 
+        email: user.email, 
+        role: user.role // 添加 role
+      } 
+    });
   });
 });
 
@@ -442,7 +476,7 @@ app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
 });
 
 app.get('/api/lost-pets', (req, res) => {
-  db.all('SELECT * FROM lost_pets', [], (err, rows) => {
+  db.all('SELECT * FROM lost_pets WHERE isDeleted = 0', [], (err, rows) => {
     if (err) {
       console.error('獲取走失寵物失敗:', err);
       return res.status(500).send('獲取數據失敗');
@@ -459,23 +493,70 @@ app.get('/api/lost-pets', (req, res) => {
   });
 });
 
+// 修改後的 GET /api/found-pets，支持 groupId 過濾
 app.get('/api/found-pets', (req, res) => {
-  db.all('SELECT * FROM found_pets', [], (err, rows) => {
+  const { groupId } = req.query;
+  let query = 'SELECT * FROM found_pets WHERE isDeleted = 0';
+  let params = [];
+
+  if (groupId) {
+    query += ' AND groupId = ?';
+    params.push(groupId);
+  }
+
+  db.all(query, params, (err, rows) => {
     if (err) {
       console.error('獲取報料寵物失敗:', err);
       return res.status(500).send('獲取數據失敗');
     }
     const pets = rows.map(pet => {
-      if (pet.isPublic) pet.contact = { name: pet.name, phoneNumber: pet.phoneNumber, email: pet.email };
+      if (pet.isPublic) {
+        pet.contact = { name: pet.reportername, phoneNumber: pet.phoneNumber, email: pet.email };
+      }
       return pet;
     });
     res.send(pets);
   });
 });
 
+app.get('/api/pending-found-ids/:foundId', (req, res) => {
+  const { foundId } = req.params;
+  db.get(
+    `SELECT groupId, pendingFoundIds 
+     FROM found_pet_groups 
+     WHERE pendingFoundIds LIKE ? AND isDeleted = 0`,
+    [`%${foundId}%`],
+    (err, row) => {
+      if (err) {
+        console.error('獲取待確認報料失敗:', err);
+        return res.status(500).json({ error: '獲取待確認報料失敗' });
+      }
+      if (!row) {
+        return res.status(200).json({ groupId: null, pendingFoundIds: [] });
+      }
+      const pendingIds = row.pendingFoundIds ? row.pendingFoundIds.split(',').filter(id => id) : [];
+      res.json({ groupId: row.groupId, pendingFoundIds: pendingIds });
+    }
+  );
+});
+
+app.get('/api/found-pet-groups/:groupId', (req, res) => {
+  const { groupId } = req.params;
+  db.get('SELECT * FROM found_pet_groups WHERE groupId = ? AND isDeleted = 0', [groupId], (err, row) => {
+    if (err) {
+      console.error('獲取群組數據失敗:', err);
+      return res.status(500).json({ error: '獲取群組數據失敗' });
+    }
+    if (!row) {
+      return res.status(404).json({ error: '群組不存在' });
+    }
+    res.json(row);
+  });
+});
+
 app.get('/api/lost-pets/:id', (req, res) => {
   const { id } = req.params;
-  db.get('SELECT * FROM lost_pets WHERE lostId = ?', [id], (err, row) => {
+  db.get('SELECT * FROM lost_pets WHERE lostId = ? AND isDeleted = 0', [id], (err, row) => {
     if (err) {
       console.error('獲取單個走失寵物失敗:', err);
       return res.status(500).send('獲取數據失敗');
@@ -496,7 +577,7 @@ app.get('/api/lost-pets/:id', (req, res) => {
 
 app.get('/api/found-pets/:id', (req, res) => {
   const { id } = req.params;
-  db.get('SELECT * FROM found_pets WHERE foundId = ?', [id], (err, row) => {
+  db.get('SELECT * FROM found_pets WHERE foundId = ? AND isDeleted = 0', [id], (err, row) => {
     if (err) {
       console.error('獲取單個報料寵物失敗:', err);
       return res.status(500).send('獲取數據失敗');
@@ -505,7 +586,7 @@ app.get('/api/found-pets/:id', (req, res) => {
       return res.status(404).send('未找到該報料寵物');
     }
     if (row.isPublic) {
-      row.contact = { name: row.name, phoneNumber: row.phoneNumber, email: row.email };
+      row.contact = { name: row.reportername, phoneNumber: row.phoneNumber, email: row.email };
     }
     res.send(row);
   });
@@ -576,11 +657,11 @@ app.post('/api/create-found-group', async (req, res) => {
     const userId = decoded.userId;
 
     const [found1Exists, found2Exists] = await Promise.all([
-      new Promise((resolve, reject) => db.get('SELECT foundId, groupId FROM found_pets WHERE foundId = ? AND isDeleted = "false"', [foundId1], (err, row) => {
+      new Promise((resolve, reject) => db.get('SELECT foundId, groupId FROM found_pets WHERE foundId = ? AND isDeleted = 0', [foundId1], (err, row) => {
         if (err) reject(err);
         else resolve(row);
       })),
-      new Promise((resolve, reject) => db.get('SELECT foundId, groupId FROM found_pets WHERE foundId = ? AND isDeleted = "false"', [foundId2], (err, row) => {
+      new Promise((resolve, reject) => db.get('SELECT foundId, groupId FROM found_pets WHERE foundId = ? AND isDeleted = 0', [foundId2], (err, row) => {
         if (err) reject(err);
         else resolve(row);
       })),
@@ -647,12 +728,10 @@ app.post('/api/confirm-found-group', async (req, res) => {
     const validConfirmIds = confirmFoundIds.filter(id => pendingFoundIds.includes(id));
     if (validConfirmIds.length === 0) return res.status(400).json({ error: '無有效嘅待確認 foundId' });
 
-    // 更新 found_pets 表嘅 groupId
     const stmt = db.prepare('UPDATE found_pets SET groupId = ? WHERE foundId = ? AND isDeleted = 0');
     validConfirmIds.forEach(foundId => stmt.run(groupId, foundId));
     stmt.finalize();
 
-    // 更新群組狀態
     pendingFoundIds = pendingFoundIds.filter(id => !validConfirmIds.includes(id)).join(',');
     db.run(`
       UPDATE found_pet_groups 
@@ -715,7 +794,6 @@ app.get('/api/matches', async (req, res) => {
   }
 
   try {
-    // 查詢與 petId 相關嘅匹配
     const matches = await new Promise((resolve, reject) => {
       db.all(
         `
@@ -818,6 +896,15 @@ app.get('/geocode', async (req, res) => {
       res.status(500).json({ error: '地理編碼服務器錯誤' });
     }
   }
+});
+
+// Admin Dashboard 路由，只有 Admin 可訪問
+app.get('/api/admin/dashboard', isAdmin, (req, res) => {
+  res.json({ 
+    message: '歡迎來到 Admin Dashboard！', 
+    userId: req.user.userId,
+    role: req.user.role 
+  });
 });
 
 app.listen(port, () => {
