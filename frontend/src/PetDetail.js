@@ -273,7 +273,7 @@ function PetDetail() {
               </div>
             </div>
 
-            {pet.isPublic && (
+            {pet.isPublic == 1 && (
               <div className="card contact-card">
                 <h2 className="subtitle">聯絡資料</h2>
                 <div className="info-grid">
