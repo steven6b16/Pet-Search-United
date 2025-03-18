@@ -8,12 +8,14 @@ import 'bulma/css/bulma.min.css';
 import './LostPetList.css';
 import { catBreeds, dogBreeds, hongKongDistricts } from './constants/PetConstants';
 
+/*
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
+*/
 
 function FoundPetList() {
   const [pets, setPets] = useState([]);
@@ -106,16 +108,49 @@ function FoundPetList() {
     setFilteredPets(pets);
   };
 
+  // 輔助函數：根據 petType 和 breed value 查找 label
+  const getBreedLabel = (petType, breed) => {
+    if (petType === 'cat') {
+      return catBreeds.find(b => b.value === breed)?.label || '未知';
+    } else if (petType === 'dog') {
+      return dogBreeds.find(b => b.value === breed)?.label || '未知';
+    }
+    return '未知';
+  };
+
+  // 格式化品種顯示：中文 <br/><small>英文</small>
+  const getBreedLabelcn = (petType, breed) => {
+    let originalLabel = '';
+    if (petType === 'cat') {
+      originalLabel = catBreeds.find(b => b.value === breed)?.label || '未知';
+    } else if (petType === 'dog') {
+      originalLabel = dogBreeds.find(b => b.value === breed)?.label || '未知';
+    } else {
+      return '未知';
+    }
+    // 使用正則表達式拆分英文和中文部分
+    const match = originalLabel.match(/^([A-Za-z\s]+)([\u4e00-\u9fa5\s㹴]+)$/);
+    if (match) {
+      const english = match[1].trim(); // 英文部分，可能有多個單詞
+      const chinese = match[2].trim(); // 中文部分
+      return `${chinese} <br/><small class="is-size-7">${english}</small>`;
+    }
+    return '未知'; // 如果格式不符，返回 '未知'
+  };
+
+  // 定義地圖 API 和版權信息
+  const basemapAPI = 'https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/basemap/wgs84/{z}/{x}/{y}.png';
+  const labelAPI = 'https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/label/hk/tc/wgs84/{z}/{x}/{y}.png';
+  const attributionInfo = '<a href="https://api.portal.hkmapservice.gov.hk/disclaimer" target="_blank" class="copyrightDiv">© 地圖資料由地政總署提供</a><div style="width:28px;height:28px;display:inline-flex;background:url(https://api.hkmapservice.gov.hk/mapapi/landsdlogo.jpg);background-size:28px;"></div>';
+
   if (loading) return <div className="has-text-centered">加載中...</div>;
 
   return (
     <section className="section lost-pet-list">
       <div className="container">
-        <h1 className="title has-text-centered">發現寵物列表</h1>
-
         {/* 導航按鈕組 */}
         <div className="buttons is-centered mb-6">
-          <a className="button is-primary is-medium" href="/pet-list" data-discover="true">
+          <a className="button is-primary is-medium" href="/found-pet-list" data-discover="true">
             同搜報料
           </a>
           <a className="button is-info is-medium" href="/lost-pet-list" data-discover="true">
@@ -128,7 +163,7 @@ function FoundPetList() {
             我要報料
           </a>
         </div>
-
+        <h1 className="title has-text-centered">發現寵物列表</h1>
         {/* 篩選區域 */}
         <div className="box">
           <div className="columns is-mobile">
@@ -273,10 +308,15 @@ function FoundPetList() {
 
         {/* Leaflet 地圖 */}
         <div className="box">
-          <MapContainer center={[22.3193, 114.1694]} zoom={10} style={{ height: '400px', width: '100%' }}>
+        <MapContainer center={[22.4037,114.1304]} zoom={11} style={{ height: '400px', width: '100%' }}>
+            {/* 基底圖層 */}
             <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url={basemapAPI}
+              attribution={attributionInfo}
+            />
+            {/* 標籤圖層（中文） */}
+            <TileLayer
+              url={labelAPI}
             />
             {filteredPets
               .filter((pet) => pet.found_location)
@@ -291,6 +331,8 @@ function FoundPetList() {
                         種類/性別:{' '}
                         {pet.petType === 'cat' ? '貓' : pet.petType === 'dog' ? '狗' : '未知'} /{' '}
                         {pet.gender === 'male' ? '公' : pet.gender === 'female' ? '母' : '未知'}
+                        <br />
+                        品種: {getBreedLabel(pet.petType, pet.breed)} {/* 顯示 label */}
                         <br />
                         發現日期: {pet.found_date}
                         <br />
@@ -326,7 +368,11 @@ function FoundPetList() {
                     </figure>
                   </div>
                   <div className="card-content">
-                    <p className="title is-5">{pet.reportername || '匿名'}</p>
+                    <p className="title is-5">
+                      <span
+                          dangerouslySetInnerHTML={{ __html: getBreedLabelcn(pet.petType, pet.breed) }}
+                        />
+                    </p>
                     <div className="content">
                       <p>
                         <strong className="tag is-primary is-light">種類 / 性別:</strong>{' '}
@@ -337,14 +383,15 @@ function FoundPetList() {
                         <strong className="tag is-primary is-light">毛色:</strong> {pet.color || '未知'}
                       </p>
                       <p>
-                        <strong className="tag is-primary is-light">品種:</strong> {pet.breed || '未知'}
-                      </p>
-                      <p>
                         <strong className="tag is-primary is-light">發現日期:</strong> {pet.found_date}
                       </p>
                       <p>
                         <strong className="tag is-primary is-light">發現地點:</strong>{' '}
                         {pet.displayLocation || '未知'}
+                      </p>
+                      <p>
+                        <strong className="tag is-primary is-light">報料人士:</strong>{' '}
+                        {pet.reportername || '匿名'}
                       </p>
                     </div>
                     <Link to={`/pet/${pet.foundId}`} className="button is-primary">
