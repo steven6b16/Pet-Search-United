@@ -346,6 +346,8 @@ function PetDetail() {
         )}
         {!coordinates && <p className="has-text-centered">此寵物無可用位置信息</p>}
 
+        {!coordinates && <p className="has-text-centered">此寵物無可用位置信息</p>}
+
         {/* 發現軌跡時間線 */}
         {pet?.foundId && allPositions.length > 0 && (
           <div className="card">

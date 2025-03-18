@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import './Reportpage.css';
 import { detailinputs } from './constants/QuickInput';
 import { catBreeds, dogBreeds, petage } from './constants/PetConstants';
+import proj4 from 'proj4';
 
 // 使用本地圖標
 const defaultIcon = L.icon({
@@ -21,18 +22,69 @@ L.Marker.prototype.options.icon = defaultIcon;
 function LocationMarker({ setLatLng, setLocation }) {
   const [position, setPosition] = useState(null);
 
+  // 定義 WGS84 和 HK1980 的投影參數
+  proj4.defs('WGS84', '+proj=longlat +datum=WGS84 +no_defs');
+  proj4.defs('HK1980', '+proj=tmerc +lat_0=22.31213333333333 +lon_0=114.1785555555556 +k=1 +x_0=836694.05 +y_0=819069.8 +ellps=intl +towgs84=-162.619,-276.959,-161.764,0.067753,-2.24365,-1.15883,-1.09425 +units=m +no_defs');
+
+  // WGS84 轉 HK1980
+  const convertToHK1980Grid = (lat, lng) => {
+    const [x, y] = proj4('WGS84', 'HK1980', [lng, lat]); // 注意：proj4 使用 [經度, 緯度] 順序
+    return { x: Math.round(x), y: Math.round(y) };
+  };
+
+  const fetchHKLocation = async (x, y) => {
+    const apiUrl = `https://geodata.gov.hk/gs/api/v1.0.0/identify?x=${x}&y=${y}&lang=zh`; // 使用代理路徑
+    try {
+      const response = await fetch(apiUrl);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('HK API 查詢錯誤：', error);
+      throw error;
+    }
+  };
+
   const map = useMapEvents({
     click(e) {
       console.log('地圖點擊：', e.latlng);
       const { lat, lng } = e.latlng;
       setPosition([lat, lng]);
       setLatLng({ lat, lng });
-      reverseGeocode(lat, lng)
-        .then(({ fullAddress, simplifiedAddress }) => {
-          console.log('逆向地理編碼結果：', { fullAddress, simplifiedAddress });
+
+      // 轉換為香港1980方格網坐標
+      const hkCoords = convertToHK1980Grid(lat, lng);
+      console.log('轉換後坐標：', hkCoords);
+
+      // 驗證坐標範圍
+      if (hkCoords.x < 800000 || hkCoords.x > 860000 || hkCoords.y < 800000 || hkCoords.y > 850000) {
+        console.error('坐標超出香港範圍：', hkCoords);
+        return;
+      }
+
+      // 使用轉換後的坐標查詢地點
+      fetchHKLocation(hkCoords.x, hkCoords.y)
+        .then(data => {
+          console.log('HK API 結果：', data);
+          let fullAddress = '未知地址';
+          let simplifiedAddress = '未知簡化地址';
+
+          if (data?.results?.length > 0) {
+            const result = data.results[0];
+            const addressInfo = result.addressInfo?.[0];
+            if (addressInfo) {
+              // 組合 caddress 和 cname
+              const caddress = addressInfo.caddress || '';
+              const cname = addressInfo.cname || '';
+              fullAddress = `${caddress}${cname}`; // 例如 "朗屏路1號畫屏樓"
+              simplifiedAddress = `${caddress}${cname}`; // 如果沒有 caddress，用 fullAddress
+            }
+          }
+
+          console.log('提取的地址：', { fullAddress, simplifiedAddress });
           setLocation(fullAddress, simplifiedAddress);
         })
-        .catch(err => console.error('地理編碼錯誤：', err));
+        .catch(err => console.error('地點查詢錯誤：', err));
     },
   });
 
@@ -99,10 +151,7 @@ function ReportLost() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    // 限制 details 字段最多 200 字
-    if (name === 'details' && value.length > 200) {
-      return; // 超過 200 字唔更新
-    }
+    if (name === 'details' && value.length > 200) return;
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
@@ -133,15 +182,12 @@ function ReportLost() {
     }
     setOtherPhotos(files);
     setPhotoError('');
-    if (files.length > 0) {
-      await processPhoto(files[0]);
-    }
+    if (files.length > 0) await processPhoto(files[0]);
   };
 
   const processPhoto = async (file) => {
     const photoFormData = new FormData();
     photoFormData.append('image', file);
-
     try {
       const response = await axios.post('http://127.0.0.1:5001/upload', photoFormData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -226,7 +272,6 @@ function ReportLost() {
   const handleQuickInput = (text) => {
     setFormData(prev => {
       const newDetails = prev.details ? `${prev.details}, ${text}` : text;
-      // 確保快速輸入後唔超過 200 字
       return {
         ...prev,
         details: newDetails.length > 200 ? newDetails.slice(0, 200) : newDetails,
@@ -234,7 +279,6 @@ function ReportLost() {
     });
   };
 
-  // 全頁重置功能
   const handleReset = () => {
     setFormData(initialFormData);
     setFrontPhoto(null);
@@ -244,6 +288,11 @@ function ReportLost() {
     setPhotoError('');
     document.querySelectorAll('input[type="file"]').forEach(input => (input.value = ''));
   };
+
+  // 定義地圖 API 和版權信息
+  const basemapAPI = 'https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/basemap/wgs84/{z}/{x}/{y}.png';
+  const labelAPI = 'https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/label/hk/tc/wgs84/{z}/{x}/{y}.png';
+  const attributionInfo = '<a href="https://api.portal.hkmapservice.gov.hk/disclaimer" target="_blank" class="copyrightDiv">© 地圖資料由地政總署提供</a><div style="width:28px;height:28px;display:inline-flex;background:url(https://api.hkmapservice.gov.hk/mapapi/landsdlogo.jpg);background-size:28px;"></div>';
 
   return (
     <section className="section">
@@ -267,7 +316,6 @@ function ReportLost() {
                   />
                 </div>
               </div>
-
               <div className="field">
                 <label className="label">聯絡電話</label>
                 <div className="control is-flex">
@@ -288,7 +336,6 @@ function ReportLost() {
                   />
                 </div>
               </div>
-
               <div className="field">
                 <label className="label">聯絡電郵</label>
                 <div className="control">
@@ -303,7 +350,6 @@ function ReportLost() {
                   />
                 </div>
               </div>
-
               <div className="field">
                 <label className="checkbox">
                   <input
@@ -334,7 +380,6 @@ function ReportLost() {
                   />
                 </div>
               </div>
-
               <div className="field">
                 <label className="label">寵物種類</label>
                 <div className="control">
@@ -360,7 +405,6 @@ function ReportLost() {
                   </label>
                 </div>
               </div>
-
               <div className="field">
                 <label className="label">性別</label>
                 <div className="control">
@@ -386,7 +430,6 @@ function ReportLost() {
                   </label>
                 </div>
               </div>
-
               <div className="field">
                 <label className="label">品種</label>
                 <div className="control">
@@ -407,7 +450,6 @@ function ReportLost() {
                   </div>
                 </div>
               </div>
-
               <div className="field">
                 <label className="label">年齡</label>
                 <div className="control">
@@ -423,7 +465,6 @@ function ReportLost() {
                   </div>
                 </div>
               </div>
-
               <div className="field">
                 <label className="label">顏色</label>
                 <div className="control">
@@ -438,7 +479,6 @@ function ReportLost() {
                   />
                 </div>
               </div>
-
               <div className="field">
                 <label className="label">遺失時間</label>
                 <div className="control is-flex">
@@ -465,15 +505,17 @@ function ReportLost() {
                   </div>
                 </div>
               </div>
-
               <div className="field">
                 <label className="label">遺失地點</label>
                 <div className="control">
                   <div className="map-container">
-                    <MapContainer center={[22.3193, 114.1694]} zoom={11} style={{ height: '300px', width: '100%' }}>
+                    <MapContainer center={[22.3193, 114.1694]} zoom={12} style={{ height: '300px', width: '100%' }}>
                       <TileLayer
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url={basemapAPI}
+                        attribution={attributionInfo}
+                      />
+                      <TileLayer
+                        url={labelAPI}
                       />
                       <LocationMarker setLatLng={handleMapUpdate} setLocation={handleSetLocation} />
                     </MapContainer>
@@ -481,7 +523,6 @@ function ReportLost() {
                   <p className="help">地點: {formData.displayLocation || '未選擇'}</p>
                 </div>
               </div>
-
               <div className="field">
                 <label className="label">其他詳情</label>
                 <p className="help is-info">
@@ -494,7 +535,7 @@ function ReportLost() {
                     value={formData.details}
                     onChange={handleChange}
                     placeholder="請輸入寵物嘅描述或發現情況"
-                    maxLength={200} // HTML 限制 200 字
+                    maxLength={200}
                   />
                   <p className="help">
                     字數: {formData.details.length}/200
@@ -533,7 +574,6 @@ function ReportLost() {
                   </div>
                 </div>
               </div>
-
               <div className="field">
                 <label className="label">晶片編號</label>
                 <div className="control">
@@ -547,7 +587,6 @@ function ReportLost() {
                   />
                 </div>
               </div>
-
               <div className="field">
                 <label className="label">寵物正面相（1 張）</label>
                 <div className="control">
@@ -561,7 +600,6 @@ function ReportLost() {
                   {frontPhoto && <p className="help">已選擇: {frontPhoto.name}</p>}
                 </div>
               </div>
-
               <div className="field">
                 <label className="label">寵物側面相（1 張）</label>
                 <div className="control">
@@ -575,7 +613,6 @@ function ReportLost() {
                   {sidePhoto && <p className="help">已選擇: {sidePhoto.name}</p>}
                 </div>
               </div>
-
               <div className="field">
                 <label className="label">其他相片（最多 5 張）</label>
                 <div className="control">
