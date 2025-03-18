@@ -68,7 +68,8 @@ function ReportLost() {
     gender: '',
     age: '',
     color: '',
-    lost_date: '',
+    lostDate: '', // 新增日期字段
+    lostTime: '', // 新增時間字段
     location: '',
     details: '',
     chipNumber: '',
@@ -86,6 +87,15 @@ function ReportLost() {
   const [otherPhotos, setOtherPhotos] = useState([]);
   const [latLng, setLatLng] = useState(null);
   const [photoError, setPhotoError] = useState('');
+
+  const generateTimeOptions = () => {
+    const options = [];
+    for (let hour = 0; hour < 24; hour++) {
+      options.push(`${hour.toString().padStart(2, '0')}:00`);
+      options.push(`${hour.toString().padStart(2, '0')}:30`);
+    }
+    return options;
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -186,12 +196,27 @@ function ReportLost() {
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log('提交前 formData:', formData);
+    if (!formData.lostDate || !formData.lostTime) {
+      alert('請選擇遺失日期同時間！');
+      return;
+    }
+  
     const formDataToSend = new FormData();
-    for (let key in formData) formDataToSend.append(key, formData[key]);
+    const lostDateTime = `${formData.lostDate} ${formData.lostTime}`; // 組合成 "YYYY-MM-DD HH:MM"
+    for (let key in formData) {
+      if (key === 'isPublic') {
+        formDataToSend.append(key, formData[key] ? 1 : 0);
+      } else if (key === 'lostDate' || key === 'lostTime') {
+        // 唔單獨傳 lostDate 或 lostTime
+      } else {
+        formDataToSend.append(key, formData[key]);
+      }
+    }
+    formDataToSend.append('lost_date', lostDateTime); // 添加組合後嘅 lost_date
     if (frontPhoto) formDataToSend.append('frontPhoto', frontPhoto);
     if (sidePhoto) formDataToSend.append('sidePhoto', sidePhoto);
     otherPhotos.forEach(photo => formDataToSend.append('otherPhotos', photo));
-
+  
     axios
       .post('http://localhost:3001/api/report-lost', formDataToSend)
       .then(res => alert(`報失成功，ID: ${res.data.lostId}`))
@@ -217,7 +242,6 @@ function ReportLost() {
     setOtherPhotos([]);
     setLatLng(null);
     setPhotoError('');
-    // 重置文件輸入字段
     document.querySelectorAll('input[type="file"]').forEach(input => (input.value = ''));
   };
 
@@ -417,15 +441,28 @@ function ReportLost() {
 
               <div className="field">
                 <label className="label">遺失時間</label>
-                <div className="control">
+                <div className="control is-flex">
                   <input
-                    className="input"
+                    className="input mr-2"
                     type="date"
-                    name="lost_date"
-                    value={formData.lost_date}
+                    name="lostDate"
+                    value={formData.lostDate}
                     onChange={handleChange}
                     required
                   />
+                  <div className="select">
+                    <select
+                      name="lostTime"
+                      value={formData.lostTime}
+                      onChange={handleChange}
+                      required
+                    >
+                      <option value="">選擇時間</option>
+                      {generateTimeOptions().map((time) => (
+                        <option key={time} value={time}>{time}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 

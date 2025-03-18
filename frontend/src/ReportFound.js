@@ -61,7 +61,8 @@ function ReportFound() {
     gender: '',
     age: '',
     color: '',
-    found_date: '',
+    foundDate: '', // 新增日期字段
+    foundTime: '', // 新增時間字段
     found_location: '',
     found_details: '',
     region: '',
@@ -77,6 +78,15 @@ function ReportFound() {
   const [photos, setPhotos] = useState([]);
   const [latLng, setLatLng] = useState(null);
   const [geoError, setGeoError] = useState('');
+
+  const generateTimeOptions = () => {
+    const options = [];
+    for (let hour = 0; hour < 24; hour++) {
+      options.push(`${hour.toString().padStart(2, '0')}:00`);
+      options.push(`${hour.toString().padStart(2, '0')}:30`);
+    }
+    return options;
+  };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -131,15 +141,25 @@ function ReportFound() {
       alert('請選擇品種！');
       return;
     }
-    if (!formData.found_date) {
-      alert('請選擇發現時間！');
+    if (!formData.foundDate || !formData.foundTime) {
+      alert('請選擇發現日期同時間！');
       return;
     }
-
+  
     const formDataToSend = new FormData();
-    for (let key in formData) formDataToSend.append(key, formData[key]);
+    const foundDateTime = `${formData.foundDate} ${formData.foundTime}`; // 組合成 "YYYY-MM-DD HH:MM"
+    for (let key in formData) {
+      if (key === 'isPublic') {
+        formDataToSend.append(key, formData[key] ? 1 : 0);
+      } else if (key === 'foundDate' || key === 'foundTime') {
+        // 唔單獨傳 foundDate 或 foundTime
+      } else {
+        formDataToSend.append(key, formData[key]);
+      }
+    }
+    formDataToSend.append('found_date', foundDateTime); // 添加組合後嘅 found_date
     photos.forEach(photo => formDataToSend.append('photos', photo));
-
+  
     axios.post('http://localhost:3001/api/report-found', formDataToSend)
       .then(res => alert(`報料成功，ID: ${res.data.foundId}`))
       .catch(err => console.error('提交失敗:', err));
@@ -243,8 +263,28 @@ function ReportFound() {
               </div>
               <div className="field">
                 <label className="label">發現時間：</label>
-                <div className="control">
-                  <input className="input" type="date" name="found_date" value={formData.found_date} onChange={handleChange} required />
+                <div className="control is-flex">
+                  <input
+                    className="input mr-2"
+                    type="date"
+                    name="foundDate"
+                    value={formData.foundDate}
+                    onChange={handleChange}
+                    required
+                  />
+                  <div className="select">
+                    <select
+                      name="foundTime"
+                      value={formData.foundTime}
+                      onChange={handleChange}
+                      required
+                    >
+                      <option value="">選擇時間</option>
+                      {generateTimeOptions().map((time) => (
+                        <option key={time} value={time}>{time}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
               <div className="field">
