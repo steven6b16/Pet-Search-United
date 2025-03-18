@@ -70,9 +70,9 @@ function ReportFound() {
     displayLocation: '',
     holding_location: '',
     status: '',
-    isPublic: false,
-    isFound: false,
-    isDeleted: false,
+    isPublic: 0,
+    isFound: 0,
+    isDeleted: 0,
   });
   const [photos, setPhotos] = useState([]);
   const [latLng, setLatLng] = useState(null);
@@ -106,6 +106,7 @@ function ReportFound() {
     setFormData(prev => ({
       ...prev,
       location: latLngObj ? `${latLngObj.lat},${latLngObj.lng}` : prev.location,
+      found_location: latLngObj ? `${latLngObj.lat},${latLngObj.lng}` : prev.found_location, // 新增這行
       region: newRegion,
     }));
     setLatLng(latLngObj);

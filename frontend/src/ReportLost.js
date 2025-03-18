@@ -75,9 +75,9 @@ function ReportLost() {
     fullAddress: '',
     displayLocation: '',
     region: '',
-    isPublic: false,
-    isFound: false,
-    isDeleted: false,
+    isPublic: 0,
+    isFound: 0,
+    isDeleted: 0,
   };
 
   const [formData, setFormData] = useState(initialFormData);
