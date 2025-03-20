@@ -15,6 +15,7 @@ import 'leaflet/dist/leaflet.css';
 import './App.css';
 import { FaPaw, FaSearch, FaUser, FaSignOutAlt, FaFilter, FaPhone, FaHeart, FaShieldAlt, FaLock, FaArrowRight, FaArrowCircleRight  } from 'react-icons/fa';
 import { TbArrowWaveRightDown } from "react-icons/tb";
+import { RiChatUploadFill, RiChatSearchFill } from "react-icons/ri";
 
 function App() {
   const [lostPets, setLostPets] = useState([]);
@@ -62,7 +63,7 @@ function App() {
   const filteredLostPets = lostPets.filter(pet => {
     const matchesSearch = (
       (pet.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (pet.full_address?.toLowerCase() || pet.region?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+      (pet.fullAddress?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
     const matchesType = petTypeFilter ? pet.petType === petTypeFilter : true;
     return matchesSearch && matchesType;
@@ -191,7 +192,7 @@ function App() {
                     <div className="columns is-multiline is-centered">
                       <div className="column is-3 has-text-centered">
                         <div className="quick-step">
-                          <FaPaw className="step-icon" />
+                        <RiChatUploadFill className="step-icon" />
                           <h3 className="step-title">1. 報失</h3>
                           <p className="step-description">填寫寵物資料，快速提交報失信息</p>
                         </div>
@@ -199,7 +200,7 @@ function App() {
                       <TbArrowWaveRightDown/>
                       <div className="column is-3 has-text-centered">
                         <div className="quick-step">
-                          <FaSearch className="step-icon" />
+                          <RiChatSearchFill className="step-icon" />
                           <h3 className="step-title">2. 搜尋</h3>
                           <p className="step-description">瀏覽線索，尋找匹配的寵物</p>
                         </div>
@@ -256,45 +257,7 @@ function App() {
                     </div>
                   </div>
 
-                  {/* 成功案例 */}
-                  <div className="success-stories form-card mb-6">
-                    <h2 className="subtitle is-4 mb-4 has-text-centered">
-                      <FaHeart className="mr-2" /> 成功案例
-                    </h2>
-                    <div className="columns is-multiline is-centered">
-                      <div className="column is-4">
-                        <div className="story-card">
-                          {/* 確保 public/success-story-1.jpg 存在 */}
-                          <img src="/success-story-1.jpg" alt="成功案例 1" className="story-image" />
-                          <p className="story-quote">
-                            "感謝同搜毛棄，我終於尋回我的小花！"
-                          </p>
-                          <p className="story-author">— 陳小姐，2025年3月</p>
-                        </div>
-                      </div>
-                      <div className="column is-4">
-                        <div className="story-card">
-                          {/* 確保 public/success-story-2.jpg 存在 */}
-                          <img src="/success-story-2.jpg" alt="成功案例 2" className="story-image" />
-                          <p className="story-quote">
-                            "很快便找到我的阿寶，十分感激！"
-                          </p>
-                          <p className="story-author">— 李先生，2025年2月</p>
-                        </div>
-                      </div>
-                      <div className="column is-4">
-                        <div className="story-card">
-                          {/* 確保 public/success-story-3.jpg 存在 */}
-                          <img src="/success-story-3.jpg" alt="成功案例 3" className="story-image" />
-                          <p className="story-quote">
-                            "專業的平台，助我與毛毛團聚！"
-                          </p>
-                          <p className="story-author">— 張太太，2025年1月</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
+                  
                   {/* 寵物地圖 */}
                   <div className="form-card mb-6">
                     <h2 className="subtitle is-4 mb-4 has-text-centered">
@@ -389,24 +352,23 @@ function App() {
                                     </figure>
                                   ) : (
                                     <figure className="image is-4by3">
-                                      {/* 確保 public/placeholder-pet.jpg 存在 */}
-                                      <img
-                                        src="/placeholder-pet.jpg"
-                                        alt="寵物占位圖"
-                                        className="pet-image"
-                                      />
-                                    </figure>
+                                    <img
+                                      src="/icon/cat.png"
+                                      alt="寵物占位圖"
+                                      className="pet-image"
+                                    />
+                                  </figure>
                                   )}
                                   <div className="pet-info">
                                     <p className="pet-name">{pet.name}</p>
                                     <p className="pet-detail">種類：{pet.petType === 'cat' ? '貓' : '狗'}</p>
                                     <p className="pet-detail">走失日期：{pet.lost_date?.split(' ')[0]}</p>
-                                    <p className="pet-detail">地區：{pet.region || '未知'}</p>
+                                    <p className="pet-detail">走失地點：{pet.displayLocation || '未知'}</p>
                                     <div className="buttons is-centered mt-2">
                                       <Link to={`/pet/${pet.lostId}`} className="button custom-button is-small">
                                         查看詳情
                                       </Link>
-                                      {pet.isPublic && pet.phoneNumber && (
+                                      {pet.isPublic == 1 && pet.phoneNumber && (
                                         <a href={`tel:${pet.phoneNumber}`} className="button custom-contact-button is-small">
                                           <FaPhone className="mr-2" /> 聯繫主人
                                         </a>
@@ -444,7 +406,7 @@ function App() {
                                 ) : (
                                   <figure className="image is-48x48">
                                     <img
-                                      src="/placeholder-pet.jpg"
+                                      src="/icon/cat.png"
                                       alt="寵物占位圖"
                                       className="is-rounded"
                                     />
@@ -458,7 +420,7 @@ function App() {
                                 <p className="is-size-7 has-text-grey">
                                   發現時間：{pet.found_date?.split(' ')[0]}
                                 </p>
-                                {pet.isPublic && pet.reportername && pet.phoneNumber && (
+                                {pet.isPublic == 1 && pet.reportername && pet.phoneNumber && (
                                   <p className="is-size-7 has-text-grey">
                                     報料人：{pet.reportername} | 電話：{pet.phoneNumber}
                                   </p>
@@ -521,6 +483,45 @@ function App() {
                       </p>
                     </div>
                   </div>
+                  
+                  {/* 成功案例 */}
+                  <div className="success-stories form-card mb-6">
+                    <h2 className="subtitle is-4 mb-4 has-text-centered">
+                      <FaHeart className="mr-2" /> 成功案例
+                    </h2>
+                    <div className="columns is-multiline is-centered">
+                      <div className="column is-4">
+                        <div className="story-card">
+                          {/* 確保 public/success-story-1.jpg 存在 */}
+                          <img src="/success-story-1.jpg" alt="成功案例 1" className="story-image" />
+                          <p className="story-quote">
+                            "感謝同搜毛棄，我終於尋回我的小花！"
+                          </p>
+                          <p className="story-author">— 陳小姐，2025年3月</p>
+                        </div>
+                      </div>
+                      <div className="column is-4">
+                        <div className="story-card">
+                          {/* 確保 public/success-story-2.jpg 存在 */}
+                          <img src="/success-story-2.jpg" alt="成功案例 2" className="story-image" />
+                          <p className="story-quote">
+                            "很快便找到我的阿寶，十分感激！"
+                          </p>
+                          <p className="story-author">— 李先生，2025年2月</p>
+                        </div>
+                      </div>
+                      <div className="column is-4">
+                        <div className="story-card">
+                          {/* 確保 public/success-story-3.jpg 存在 */}
+                          <img src="/success-story-3.jpg" alt="成功案例 3" className="story-image" />
+                          <p className="story-quote">
+                            "專業的平台，助我與毛毛團聚！"
+                          </p>
+                          <p className="story-author">— 張太太，2025年1月</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* 合作夥伴 */}
                   <div className="partners-section form-card mb-6">
@@ -561,9 +562,16 @@ function App() {
                     </p>
                   </div>
 
-                  {/* 頁腳 */}
-                  <footer className="custom-footer has-text-centered">
-                    <p className="is-size-6">
+                  
+                  
+                </div>
+              } />
+            </Routes>
+          </div>
+        </section>
+
+        <footer className="custom-footer has-text-centered">
+          <p className="is-size-6">
                       © 2025 同搜毛棄 Pet Search United. 版權所有。
                     </p>
                     <p className="is-size-7">
@@ -573,12 +581,6 @@ function App() {
                       <FaLock className="mr-2" /> 我們重視您的隱私，所有信息將受到嚴格保護。
                     </p>
                   </footer>
-                </div>
-              } />
-            </Routes>
-          </div>
-        </section>
-
         <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onLogin={handleLogin} />
         <RegisterModal isOpen={isRegisterOpen} onClose={() => setIsRegisterOpen(true)} />
       </div>

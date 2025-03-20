@@ -129,7 +129,7 @@ body {
 
 /* 整體樣式 */
 .custom-section {
- /* background: #F5F5F5 url('./background-pattern.png') repeat;*/
+  
   min-height: 100vh;
   padding-top: 100px;
   padding-bottom: 60px;
@@ -137,11 +137,11 @@ body {
 
 /* 頭部區域 */
 .hero-section {
- /* background: #00A3E0 url('./hero-bg.jpg') no-repeat center center;*/
+  background-color: #F5F5F5;
   background-size: cover;
   padding: 80px 20px;
   border-radius: 12px;
-  color: #FFFFFF;
+  color: #00A3E0;
   position: relative;
   overflow: hidden;
 }
