@@ -254,9 +254,11 @@ function PetDetail() {
           <div className="info-container">
             <div className="card">
               <h2 className="subtitle">寵物資料</h2>
+              <p><spran class="caseid">個案編號: {pet.lostId || pet.foundId}</spran> </p>
               <div className="info-grid">
-                <p><strong>ID:</strong> {pet.lostId || pet.foundId}</p>
-                <p><strong>名稱:</strong> {pet.name || '未知'}</p>
+                {pet.name && (
+                <p><strong>寵物名稱:</strong> {pet.name || '未知'}</p>
+                )}
                 {isLostPet && (
                   <>
                     <p><strong>種類:</strong> {pet.petType === 'cat' ? '貓' : pet.petType === 'dog' ? '狗' : pet.petType || '未知'}</p>
@@ -267,7 +269,16 @@ function PetDetail() {
                     <p><strong>晶片號碼:</strong> {pet.chipNumber || '無'}</p>
                   </>
                 )}
-                <p><strong>日期:</strong> {pet.lost_date || pet.found_date || '未知'}</p>
+                {pet.lost_date && (
+                  <>
+                  <p><strong>遺失日期:</strong> {pet.lost_date}</p>
+                  </>
+                )}
+                {pet.found_date && (
+                  <>
+                  <p><strong>發現日期:</strong> {pet.found_date}</p>
+                  </>
+                )}
                 <p><strong>地點:</strong> {pet.displayLocation || pet.location || pet.found_location || '未知'}</p>
                 <p className="details"><strong>詳情:</strong> {pet.details || pet.found_details || '無'}</p>
               </div>
@@ -345,12 +356,13 @@ function PetDetail() {
               {[...(pet.foundId ? [pet] : []), ...relatedFoundPets]
                 .sort((a, b) => new Date(a.found_date) - new Date(b.found_date))
                 .map((p) => (
-                  <div key={p.foundId} className="timeline-item">
-                    <p><strong>報料 ID:</strong> <a href={`/pet/${p.foundId}`}>{p.foundId}</a></p>
+                  <a href={`/pet/${p.foundId}`}><div key={p.foundId} className="timeline-item">
+                    
                     <p><strong>發現時間:</strong> {new Date(p.found_date).toLocaleString()}</p>
                     <p><strong>地點:</strong> {p.displayLocation || p.found_location || '未知'}</p>
                     <p><strong>詳情:</strong> {p.found_details || '無'}</p>
-                  </div>
+                    <p><spran class="caseid">個案編號: {p.foundId}</spran></p>
+                  </div></a>
                 ))}
             </div>
             <div className="field">
