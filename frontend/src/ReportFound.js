@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import './Reportpage.css';
 import { detailinputs } from './constants/QuickInput';
 import { catBreeds, dogBreeds, petage } from './constants/PetConstants';
+import proj4 from 'proj4';
 import { FaCheckCircle, FaTimesCircle, FaLock, FaPhone, FaPaw } from 'react-icons/fa';
 
 // 使用本地圖標（假設圖標文件在 public 目錄下）
@@ -22,16 +23,120 @@ L.Marker.prototype.options.icon = defaultIcon;
 function LocationMarker({ setLatLng, setLocation }) {
   const [position, setPosition] = useState(null);
 
+  // 定義 WGS84 和 HK1980 的投影參數
+  proj4.defs('WGS84', '+proj=longlat +datum=WGS84 +no_defs');
+  proj4.defs('HK1980', '+proj=tmerc +lat_0=22.31213333333333 +lon_0=114.1785555555556 +k=1 +x_0=836694.05 +y_0=819069.8 +ellps=intl +towgs84=-162.619,-276.959,-161.764,0.067753,-2.24365,-1.15883,-1.09425 +units=m +no_defs');
+
+  // WGS84 轉 HK1980
+  const convertToHK1980Grid = (lat, lng) => {
+    const [x, y] = proj4('WGS84', 'HK1980', [lng, lat]);
+    return { x: Math.round(x), y: Math.round(y) };
+  };
+
+  // 清理地址中的 HTML 標籤
+  const cleanAddress = (address) => {
+    if (!address) return '';
+    return address.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').trim();
+  };
+
+  // 判斷是否為香港範圍
+  const isHongKong = (lat, lng) => {
+    return lat >= 22.15 && lat <= 22.55 && lng >= 113.85 && lng <= 114.45;
+  };
+
+  const fetchHKLocation = async (x, y, reverseFullAddress, district) => {
+    const apiUrl = `https://geodata.gov.hk/gs/api/v1.0.0/identify?x=${x}&y=${y}&lang=zh`;
+    try {
+      const response = await fetch(apiUrl);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+
+      let fullAddress = reverseFullAddress || '未知';
+      let simplifiedAddress = '未知簡化地址';
+
+      if (data?.results?.length > 0) {
+        const result = data.results[0];
+        const addressInfo = result.addressInfo?.[0];
+        if (addressInfo) {
+          const caddress = cleanAddress(addressInfo.caddress || '');
+          const cname = cleanAddress(addressInfo.cname || '');
+          simplifiedAddress = `${district} ${caddress}${cname}`.trim(); // 加入 district
+        }
+      }
+      setLocation(fullAddress, simplifiedAddress);
+      return data;
+    } catch (error) {
+      console.error('HK API 查詢錯誤：', error);
+      setLocation(reverseFullAddress || '未知地址', district || '查詢失敗');
+      throw error;
+    }
+  };
+
+  // 使用 OpenStreetMap Nominatim API 進行逆向地理編碼
+  async function reverseGeocode(lat, lng) {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=zh-TW`;
+    try {
+      const response = await axios.get(url);
+      const data = response.data;
+
+      if (!data || data.error) {
+        throw new Error(data?.error || '無結果');
+      }
+
+      const fullAddress = data.display_name || '未知地址';
+      const addressDetails = data.address;
+
+      // 根據地區選擇適當的 district
+      let district = '';
+      if (isHongKong(lat, lng)) {
+        // 香港：優先使用 suburb（如 "尖沙咀"）或 city_district（如 "油尖旺區"）addressDetails.suburb || || addressDetails.city 
+        console.log(addressDetails.suburb);
+        console.log(addressDetails.city);
+        console.log(addressDetails.city_district);
+        district = addressDetails.city || '';
+      } else {
+        // 台灣或其他地區：使用 city 或 county（如 "台北市" 或 "台中市"）
+        district = addressDetails.city || addressDetails.county || addressDetails.town || addressDetails.suburb || '';
+      }
+
+      // 構建更完整的 simplifiedAddress，包含街道和名稱
+      const road = addressDetails.road || '';
+      const houseNumber = addressDetails.house_number || '';
+      const name = addressDetails.amenity || addressDetails.building || '';
+      const simplifiedAddress = `${district} ${road}${houseNumber}${name}`.trim() || '未知地區';
+
+      console.log('提取的地址：', { fullAddress, simplifiedAddress, district });
+      return { fullAddress, simplifiedAddress, district };
+    } catch (error) {
+      console.error('OpenStreetMap 逆向地理編碼失敗：', error.message);
+      return { fullAddress: '未知地址', simplifiedAddress: '未知地點', district: '' };
+    }
+  }
+
   const map = useMapEvents({
     click(e) {
       const { lat, lng } = e.latlng;
       setPosition([lat, lng]);
       setLatLng({ lat, lng });
+
+      const hkCoords = convertToHK1980Grid(lat, lng);
+      console.log('轉換後坐標：', hkCoords);
+
       reverseGeocode(lat, lng)
-        .then(({ fullAddress, simplifiedAddress }) => {
-          setLocation(fullAddress, simplifiedAddress);
+        .then(({ fullAddress: reverseFullAddress, simplifiedAddress: reverseSimplifiedAddress, district }) => {
+          if (!isHongKong(lat, lng) || hkCoords.x < 800000 || hkCoords.x > 860000 || hkCoords.y < 800000 || hkCoords.y > 850000) {
+            console.log('坐標超出香港範圍或非香港地區：', hkCoords);
+            setLocation(reverseFullAddress, reverseSimplifiedAddress); // 使用 Nominatim 結果
+          } else {
+            fetchHKLocation(hkCoords.x, hkCoords.y, reverseFullAddress, district)
+              .then(data => console.log('HK API 結果：', data))
+              .catch(err => console.error('地點查詢錯誤：', err));
+          }
         })
-        .catch(err => console.error('地理編碼錯誤：', err));
+        .catch(err => {
+          console.error('地理編碼錯誤：', err);
+          setLocation('未知地址', '未知地點');
+        });
     },
   });
 
