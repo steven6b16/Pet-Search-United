@@ -1,314 +1,639 @@
-/* 整體佈局與字體 */
+/* 引入 Montserrat 字體 */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
+
+/* 全局樣式 */
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Arial, sans-serif';
-  background-color: #E6F7FA;
+  font-family: 'Montserrat', sans-serif;
+  background-color: #F5F5F5;
   min-height: 100vh;
 }
 
 .container {
   padding: 0;
-  margin: 0;
+  margin: 0 auto;
+  max-width: 1200px;
+}
+
+/* 淡入動畫 */
+@keyframes fadeIn {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.8s ease-out forwards;
 }
 
 /* 導航欄 */
-.navbar {
+.custom-navbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: #fff;
-  padding: 10px 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: #0057B7;
+  padding: 15px 30px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   position: fixed;
   top: 0;
   width: 100%;
-  z-index: 30;
+  z-index: 1000;
+  box-sizing: border-box;
 }
 
-.logo {
-  font-size: 24px;
-  font-weight: bold;
-}
-
-.navLinks {
-  display: flex;
-  gap: 10px;
-}
-
-.navLink {
-  text-decoration: none;
-  color: #333;
-  padding: 8px 12px;
-  background-color: #E6F7FA;
-  border-radius: 5px;
-  font-size: 14px;
-}
-
-.userProfile {
+.navbar-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
 }
 
-.userAvatar {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
+.navbar-logo {
+  width: 50px;
+  height: 50px;
+  margin-right: 15px;
 }
 
-/* 四個主要按鈕 */
-.buttonSection {
+.navbar-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  text-transform: uppercase;
+}
+
+.navbar-menu {
   display: flex;
-  justify-content: center;
-  gap: 15px;
-  padding: 15px 20px;
-  background-color: #fff;
-  border-bottom: 1px solid #ddd;
-  margin-top: 60px; /* 避免被導航欄遮擋 */
-}
-
-.mainButton {
-  text-decoration: none;
-  color: #333;
-  padding: 8px 12px;
-  background-color: #E6F7FA;
-  border-radius: 5px;
-  font-size: 12px;
-  display: inline-block;
-}
-
-/* 主內容區域 */
-.mainContent {
-  display: flex;
-  flex-direction: column;
-  padding: 20px;
-}
-
-.contentWrapper {
-  display: flex;
-  gap: 20px;
-}
-
-.leftPanel {
-  flex: 1;
-}
-
-.rightPanel {
-  width: 300px;
-  background-color: #fff;
-  padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.placeholderText {
-  color: #888;
-  font-style: italic;
-}
-
-.sectionTitle {
-  font-size: 20px;
-  margin-bottom: 10px;
-}
-
-.petList {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 15px;
-}
-
-.petCard {
-  background-color: #fff;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  padding: 10px;
-}
-
-.petImage {
   width: 100%;
-  height: 120px;
-  object-fit: cover;
 }
 
-.petInfo {
-  text-align: center;
-  margin-top: 10px;
+.navbar-start,
+.navbar-end {
+  display: flex;
+  align-items: center;
 }
 
-.petName {
-  font-size: 14px;
-  margin: 5px 0;
-}
-
-.reportButton {
-  display: inline-block;
-  padding: 5px 10px;
-  background-color: #E6F7FA;
-  color: #333;
-  text-decoration: none;
-  border-radius: 5px;
-  font-size: 12px;
-}
-
-/* 底部地圖 */
-.mapSection {
-  margin-top: 20px;
-}
-
-.map {
-  height: 300px;
-  width: 100%;
-  border-radius: 10px;
-}
-
-/* 表單與輸入框 */
-form div {
-  /*margin: 10px 0;*/
-}
-
-form label {
-  display: inline-block;
-  width: 100px;
-  text-align: right;
-  margin-right: 10px;
-}
-
-form input,
-form select,
-form button {
-  padding: 8px;
-  border-radius: 5px;
-  border: 1px solid #ccc;
-}
-
-form button[type="submit"] {
-  background-color: #61dafb;
-  border: none;
-  cursor: pointer;
+.navbar-item {
+  color: #FFFFFF;
   padding: 10px 20px;
+  text-decoration: none;
+  font-size: 1.1rem;
+  font-weight: 500;
+  transition: color 0.3s ease, background 0.3s ease;
+  border-radius: 5px;
 }
 
-form button[type="button"] {
-  background-color: #ddd;
-  border: none;
-  cursor: pointer;
-  padding: 8px 15px;
-  margin-left: 10px;
+.navbar-item:hover {
+  color: #FFFFFF;
+  background: #00A3E0;
 }
 
-.search-section {
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid #00A3E0;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.user-name {
+  color: #FFFFFF;
+  font-weight: 500;
+  font-size: 1.1rem;
+}
+
+.custom-login-button,
+.custom-register-button,
+.custom-logout-button {
+  background: #0057B7 !important;
+  color: #FFFFFF !important;
+  border: 2px solid #FFFFFF !important;
+  border-radius: 8px !important;
+  padding: 10px 20px !important;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 600;
+  transition: background 0.3s ease, transform 0.3s ease;
+}
+
+.custom-login-button:hover,
+.custom-register-button:hover,
+.custom-logout-button:hover {
+  background: #00A3E0 !important;
+  transform: scale(1.05);
+}
+
+/* 整體樣式 */
+.custom-section {
+  
+  min-height: 100vh;
+  padding-top: 100px;
+  padding-bottom: 60px;
+}
+
+/* 頭部區域 */
+.hero-section {
+  background-color: #F5F5F5;
+  background-size: cover;
+  padding: 80px 20px;
+  border-radius: 12px;
+  color: #00A3E0;
+  position: relative;
+  overflow: hidden;
+}
+
+.paw-animation {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  gap: 10px;
+}
+
+.paw-icon {
+  font-size: 1.5rem;
+  color: #FFFFFF;
+  opacity: 0;
+  animation: pawFade 2s infinite;
+}
+
+@keyframes pawFade {
+  0% { opacity: 0; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-5px); }
+  100% { opacity: 0; transform: translateY(0); }
+}
+
+.paw-delay-1 {
+  animation-delay: 0.3s;
+}
+
+.paw-delay-2 {
+  animation-delay: 0.6s;
+}
+
+.is-hero {
+  font-size: 3.5rem !important;
+  font-weight: 700;
+  letter-spacing: 2px;
+  line-height: 1.2;
+}
+
+.custom-title {
+  color: #FFFFFF;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.slogan-container {
   margin: 20px 0;
 }
 
-.search-input,
-.category-select {
-  padding: 8px;
-  margin: 0 10px;
-  border-radius: 5px;
-  border: 1px solid #ccc;
+.slogan-text {
+  font-size: 1.2rem;
+  font-style: italic;
+  color: #FFFFFF;
+  animation: fadeIn 2s ease-in-out infinite alternate;
 }
 
-/* 電話欄位樣式 */
-.field.has-addons {
+.certification-badges {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+.certification-badge {
+  display: inline-flex;
+  align-items: center;
+  background: #0057B7;
+  color: #FFFFFF;
+  padding: 8px 20px;
+  border-radius: 25px;
+  font-size: 1rem;
+  font-weight: 600;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* 快速開始引導 */
+.quick-start-section {
+  padding: 40px;
+}
+
+.quick-step {
+  padding: 20px;
+  background: #FFFFFF;
+  border-radius: 10px;
+  transition: background 0.3s ease;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.quick-step:hover {
+  background: #E0E0E0;
+}
+
+.step-icon {
+  font-size: 2.5rem;
+  color: #00A3E0;
+  margin-bottom: 15px;
+}
+
+.step-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #0057B7;
+  margin-bottom: 10px;
+}
+
+.step-description {
+  font-size: 1rem;
+  color: #666666;
+  line-height: 1.6;
+}
+
+/* 主要功能按鈕 */
+.feature-section {
+  margin-bottom: 60px;
+}
+
+.feature-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: #0057B7;
+  border: 2px solid #FFFFFF;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  box-shadow: 0 8px 20px rgba(0, 87, 183, 0.3);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+  text-decoration: none;
+  color: #FFFFFF;
+  height: 100%;
+}
+
+.feature-card:hover {
+  transform: scale(1.05);
+  box-shadow: 0 10px 25px rgba(0, 87, 183, 0.4);
+  background: #00A3E0;
+}
+
+.feature-icon {
+  font-size: 2.5rem;
+  color: #FFFFFF;
+  margin-bottom: 15px;
+}
+
+.feature-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.feature-description {
+  font-size: 1rem;
+  color: #FFFFFF;
+  line-height: 1.6;
+}
+
+/* 成功案例 */
+.success-stories {
+  padding: 40px;
+  background: #E6F0FA;
+}
+
+.story-card {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+}
+
+.story-image {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-bottom: 15px;
+}
+
+.story-quote {
+  font-size: 1.1rem;
+  font-style: italic;
+  color: #0057B7;
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.story-author {
+  font-size: 0.9rem;
+  color: #666666;
+}
+
+/* 卡片樣式 */
+.form-card {
+  background: #FFFFFF;
+  border-radius: 10px;
+  padding: 40px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-left: 5px solid #00A3E0;
+  margin-bottom: 30px;
+}
+
+.subtitle {
+  color: #0057B7;
+  font-weight: 600;
   display: flex;
   align-items: center;
 }
 
-.field.has-addons .control.is-expanded {
-  flex-grow: 1;
-}
-
-.field.has-addons .select select {
-  border-radius: 4px 0 0 4px;
-}
-
-.field.has-addons .input {
-  border-radius: 0 4px 4px 0;
-}
-
-/* Modal 樣式 */
-.modal,
-.modal-card {
-  z-index: 9999;
-}
-
-.modal-background {
-  z-index: 9998;
-}
-
-.modal-card-body .field {
-  margin-bottom: 1.5rem;
-}
-
-.modal-card-body .label {
-  font-weight: bold;
-}
-
-.modal-card-foot .button {
-  margin-right: 0.5rem;
-}
-
-.modal-card {
+/* 寵物卡片 */
+.pet-card {
+  background: #FFFFFF;
   border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
-.modal-card-head {
-  border-bottom: none;
+.pet-card:hover {
+  transform: scale(1.03);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+}
+
+.pet-image {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 10px 10px 0 0;
+}
+
+.pet-info {
+  padding: 20px;
+  text-align: center;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.pet-name {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #0057B7;
+  margin-bottom: 10px;
+}
+
+.pet-detail {
+  font-size: 0.95rem;
+  color: #666666;
+  margin-bottom: 0px !important;
+  line-height: 1.6;
+  text-align: left;
+}
+
+/* 搜索與過濾 */
+.search-filter {
+  margin-bottom: 30px;
+}
+
+.custom-input {
+  border: 1px solid #0057B7 !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  font-size: 1rem !important;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.custom-input:focus {
+  border-color: #00A3E0 !important;
+  box-shadow: 0 0 8px rgba(0, 163, 224, 0.3) !important;
+}
+
+.custom-select select {
+  border: 1px solid #0057B7 !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  font-size: 1rem !important;
+  color: #333333 !important;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.custom-select select:focus {
+  border-color: #00A3E0 !important;
+  box-shadow: 0 0 8px rgba(0, 163, 224, 0.3) !important;
+}
+
+.custom-button {
+  background: #0057B7;
+  color: #FFFFFF;
+  border-radius: 8px;
+  padding: 12px 25px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.3s ease, transform 0.3s ease;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 600;
+}
+
+.custom-button:hover {
+  background: #00A3E0;
+  transform: scale(1.05);
+}
+
+.custom-contact-button {
+  background: #28A745;
+  color: #FFFFFF;
+  border-radius: 8px;
+  padding: 8px 15px;
+  border: none;
+  transition: background 0.3s ease, transform 0.3s ease;
+}
+
+.custom-contact-button:hover {
+  background: #218838;
+  transform: scale(1.05);
+}
+
+/* 地圖容器 */
+.map-container {
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 2px solid #00A3E0;
+}
+
+/* 最新報料動態 */
+.notification {
+  background: #F5F5F5;
+  border-radius: 10px;
   padding: 20px;
 }
 
-.modal-card-body {
-  padding: 20px;
+/* 走失寵物列表與最新報料動態間距 */
+.columns.is-narrow-gap {
+  gap: 10px !important;
 }
 
-.modal-card-foot {
-  border-top: none;
-  padding: 20px;
-  justify-content: flex-end;
+/* 報失指南 */
+.guide-list {
+  list-style: none;
+  padding: 0;
+  max-width: 600px;
+  margin: 0 auto;
 }
 
-/* Tabs 樣式 */
-.tabs.is-boxed li.is-active a {
-  background-color: #00c4cc;
-  color: #00c4cc;
+.guide-list li {
+  font-size: 1rem;
+  color: #666666;
+  margin-bottom: 15px;
+  line-height: 1.6;
+  position: relative;
+  padding-left: 25px;
 }
 
-.tabs.is-boxed a {
-  border: 1px solid #dbdbdb;
-  border-bottom: none;
-  color: #00c4cc;
+.guide-list li::before {
+  content: '🐾';
+  position: absolute;
+  left: 0;
+  color: #00A3E0;
 }
 
-/* 禁用樣式 */
-.input[disabled],
-.button.is-primary[disabled] {
-  background-color: #f5f5f5;
-  cursor: not-allowed;
+/* 常見問題 */
+.faq-item {
+  margin-bottom: 20px;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-.button.is-primary[disabled] {
-  border-color: #ccc;
-  color: #00c4cc;
+.faq-question {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #0057B7;
+  margin-bottom: 5px;
 }
 
-/* 隱藏欄位 */
-.is-hidden {
-  display: none !important;
+.faq-answer {
+  font-size: 1rem;
+  color: #666666;
+  line-height: 1.6;
 }
 
-/* 自訂按鈕樣式 */
-.register-button {
-  background-color: #00C4B4 !important;
-  color: white !important;
+/* 合作夥伴 */
+.partners-section {
+  padding: 40px;
 }
 
-.cancel-button {
-  background-color: white !important;
-  color: #333 !important;
-  border: 1px solid #dbdbdb !important;
+.partner-logo {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  margin-bottom: 10px;
+}
+
+.partner-name {
+  font-size: 0.95rem;
+  color: #666666;
+}
+
+/* 關於我們 */
+.about-section {
+  padding: 40px;
+  text-align: center;
+}
+
+.about-text {
+  font-size: 1.1rem;
+  color: #666666;
+  line-height: 1.8;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* 頁腳 */
+.custom-footer {
+  background: #0057B7;
+  color: #FFFFFF;
+  padding: 30px;
+  margin-top: 60px;
+  position: static;
+}
+
+.custom-footer a {
+  color: #00A3E0;
+  text-decoration: none;
+}
+
+.custom-footer a:hover {
+  text-decoration: underline;
+}
+
+/* 響應式設計 */
+@media (max-width: 1024px) {
+  .is-hero {
+    font-size: 2.5rem !important;
+  }
+
+  .hero-section {
+    padding: 60px 15px;
+  }
+
+  .feature-card,
+  .pet-card,
+  .story-card {
+    margin-bottom: 20px;
+  }
+
+  .columns.is-multiline .column.is-4,
+  .columns.is-multiline .column.is-3 {
+    width: 50%;
+  }
+}
+
+@media (max-width: 768px) {
+  .is-hero {
+    font-size: 2rem !important;
+  }
+
+  .hero-section {
+    padding: 40px 15px;
+  }
+
+  .columns.is-multiline .column.is-4,
+  .columns.is-multiline .column.is-3 {
+    width: 100%;
+  }
+
+  .quick-step {
+    margin-bottom: 20px;
+  }
+
+  .navbar-menu {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .navbar-start,
+  .navbar-end {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .navbar-item {
+    padding: 10px 0;
+  }
 }

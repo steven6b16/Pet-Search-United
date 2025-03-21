@@ -120,22 +120,9 @@ function FoundPetList() {
 
   // 格式化品種顯示：中文 <br/><small>英文</small>
   const getBreedLabelcn = (petType, breed) => {
-    let originalLabel = '';
-    if (petType === 'cat') {
-      originalLabel = catBreeds.find(b => b.value === breed)?.label || '未知';
-    } else if (petType === 'dog') {
-      originalLabel = dogBreeds.find(b => b.value === breed)?.label || '未知';
-    } else {
-      return '未知';
-    }
-    // 使用正則表達式拆分英文和中文部分
-    const match = originalLabel.match(/^([A-Za-z\s]+)([\u4e00-\u9fa5\s㹴]+)$/);
-    if (match) {
-      const english = match[1].trim(); // 英文部分，可能有多個單詞
-      const chinese = match[2].trim(); // 中文部分
-      return `${chinese} <br/><small class="is-size-7">${english}</small>`;
-    }
-    return '未知'; // 如果格式不符，返回 '未知'
+    const breedList = petType === 'cat' ? catBreeds : dogBreeds;
+    const foundBreed = breedList.find(item => item.value === breed);
+    return foundBreed ? foundBreed.label : '未知品種';
   };
 
   // 定義地圖 API 和版權信息

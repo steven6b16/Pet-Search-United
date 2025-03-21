@@ -50,7 +50,7 @@
   padding: 30px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
   border-left: 5px solid #1A3C5E;
-  max-width: 80%;
+  max-width: 100%;
   margin: 0 auto;
   transition: box-shadow 0.3s ease;
 }
@@ -246,7 +246,7 @@
 }
 
 /* 固定底部欄 */
-.custom-footer {
+.custom-submit-footer {
   position: fixed;
   bottom: 0;
   left: 0;
@@ -280,10 +280,12 @@
   color: #1A3C5E !important;
   border: 1px solid #1A3C5E !important;
   border-radius: 8px !important;
-  padding: 12px 40px !important;
+  padding: 8px 16px !important;
+  margin:8px!important;
   font-family: 'Montserrat', sans-serif;
   font-weight: 600;
   transition: background 0.3s ease;
+
 }
 
 .custom-back-button:hover {
@@ -336,6 +338,10 @@
   border: 1px solid #ccc;
   border-radius: 5px;
   box-sizing: border-box;
+}
+
+.control .input, .control .select select {
+  height: 48px;
 }
 
 .input:focus,
@@ -414,4 +420,101 @@
 
 .has-text-success {
   color: #28A745;
+}
+
+/* 自定義 Toggle 開關 */
+.custom-toggle {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+}
+
+.custom-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: background-color 0.3s ease;
+  border-radius: 24px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: transform 0.3s ease;
+  border-radius: 50%;
+}
+
+.custom-toggle input:checked + .toggle-slider {
+  background-color: #D4AF37; /* 金色，與主題一致 */
+}
+
+.custom-toggle input:checked + .toggle-slider:before {
+  transform: translateX(26px);
+}
+
+.toggle-label {
+  margin-left: 10px;
+  color: #1A3C5E;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 500;
+}
+
+/* 自定義 react-select 樣式 */
+.custom-react-select__control {
+  border: 1px solid #1A3C5E !important;
+  border-radius: 8px !important;
+  padding: 4px !important;
+  font-size: 1rem !important;
+  font-family: 'Montserrat', sans-serif;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.custom-react-select__control--is-focused {
+  border-color: #D4AF37 !important;
+  box-shadow: 0 0 8px rgba(212, 175, 55, 0.3) !important;
+}
+
+.custom-react-select__placeholder {
+  color: #999 !important;
+}
+
+.custom-react-select__menu {
+  border-radius: 8px !important;
+  border: 1px solid #1A3C5E !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.custom-react-select__option {
+  font-family: 'Montserrat', sans-serif;
+  color: #333 !important;
+}
+
+.custom-react-select__option--is-focused {
+  background: #E0E0E0 !important;
+}
+
+.custom-react-select__option--is-selected {
+  background: #1A3C5E !important;
+  color: #FFFFFF !important;
+}
+
+.custom-react-select__single-value {
+  color: #333 !important;
 }

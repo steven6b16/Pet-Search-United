@@ -4,8 +4,11 @@ import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './Reportpage.css';
-import { catBreeds, dogBreeds, petage } from './constants/PetConstants';
+import { detailinputs } from './constants/QuickInput';
+import { catBreeds, dogBreeds, petage , petstatus } from './constants/PetConstants';
+import proj4 from 'proj4';
 import { FaCheckCircle, FaTimesCircle, FaLock, FaPhone, FaPaw } from 'react-icons/fa';
+import Select from 'react-select'; // 引入 react-select
 
 // 使用本地圖標（假設圖標文件在 public 目錄下）
 const defaultIcon = L.icon({
@@ -21,16 +24,120 @@ L.Marker.prototype.options.icon = defaultIcon;
 function LocationMarker({ setLatLng, setLocation }) {
   const [position, setPosition] = useState(null);
 
+  // 定義 WGS84 和 HK1980 的投影參數
+  proj4.defs('WGS84', '+proj=longlat +datum=WGS84 +no_defs');
+  proj4.defs('HK1980', '+proj=tmerc +lat_0=22.31213333333333 +lon_0=114.1785555555556 +k=1 +x_0=836694.05 +y_0=819069.8 +ellps=intl +towgs84=-162.619,-276.959,-161.764,0.067753,-2.24365,-1.15883,-1.09425 +units=m +no_defs');
+
+  // WGS84 轉 HK1980
+  const convertToHK1980Grid = (lat, lng) => {
+    const [x, y] = proj4('WGS84', 'HK1980', [lng, lat]);
+    return { x: Math.round(x), y: Math.round(y) };
+  };
+
+  // 清理地址中的 HTML 標籤
+  const cleanAddress = (address) => {
+    if (!address) return '';
+    return address.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').trim();
+  };
+
+  // 判斷是否為香港範圍
+  const isHongKong = (lat, lng) => {
+    return lat >= 22.15 && lat <= 22.55 && lng >= 113.85 && lng <= 114.45;
+  };
+
+  const fetchHKLocation = async (x, y, reverseFullAddress, district) => {
+    const apiUrl = `https://geodata.gov.hk/gs/api/v1.0.0/identify?x=${x}&y=${y}&lang=zh`;
+    try {
+      const response = await fetch(apiUrl);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+
+      let fullAddress = reverseFullAddress || '未知';
+      let simplifiedAddress = '未知簡化地址';
+
+      if (data?.results?.length > 0) {
+        const result = data.results[0];
+        const addressInfo = result.addressInfo?.[0];
+        if (addressInfo) {
+          const caddress = cleanAddress(addressInfo.caddress || '');
+          const cname = cleanAddress(addressInfo.cname || '');
+          simplifiedAddress = `${district} ${caddress}${cname}`.trim(); // 加入 district
+        }
+      }
+      setLocation(fullAddress, simplifiedAddress);
+      return data;
+    } catch (error) {
+      console.error('HK API 查詢錯誤：', error);
+      setLocation(reverseFullAddress || '未知地址', district || '查詢失敗');
+      throw error;
+    }
+  };
+
+  // 使用 OpenStreetMap Nominatim API 進行逆向地理編碼
+  async function reverseGeocode(lat, lng) {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=zh-TW`;
+    try {
+      const response = await axios.get(url);
+      const data = response.data;
+
+      if (!data || data.error) {
+        throw new Error(data?.error || '無結果');
+      }
+
+      const fullAddress = data.display_name || '未知地址';
+      const addressDetails = data.address;
+
+      // 根據地區選擇適當的 district
+      let district = '';
+      if (isHongKong(lat, lng)) {
+        // 香港：優先使用 suburb（如 "尖沙咀"）或 city_district（如 "油尖旺區"）addressDetails.suburb || || addressDetails.city 
+        console.log(addressDetails.suburb);
+        console.log(addressDetails.city);
+        console.log(addressDetails.city_district);
+        district = addressDetails.city || '';
+      } else {
+        // 台灣或其他地區：使用 city 或 county（如 "台北市" 或 "台中市"）
+        district = addressDetails.city || addressDetails.county || addressDetails.town || addressDetails.suburb || '';
+      }
+
+      // 構建更完整的 simplifiedAddress，包含街道和名稱
+      const road = addressDetails.road || '';
+      const houseNumber = addressDetails.house_number || '';
+      const name = addressDetails.amenity || addressDetails.building || '';
+      const simplifiedAddress = `${district} ${road}${houseNumber}${name}`.trim() || '未知地區';
+
+      console.log('提取的地址：', { fullAddress, simplifiedAddress, district });
+      return { fullAddress, simplifiedAddress, district };
+    } catch (error) {
+      console.error('OpenStreetMap 逆向地理編碼失敗：', error.message);
+      return { fullAddress: '未知地址', simplifiedAddress: '未知地點', district: '' };
+    }
+  }
+
   const map = useMapEvents({
     click(e) {
       const { lat, lng } = e.latlng;
       setPosition([lat, lng]);
       setLatLng({ lat, lng });
+
+      const hkCoords = convertToHK1980Grid(lat, lng);
+      console.log('轉換後坐標：', hkCoords);
+
       reverseGeocode(lat, lng)
-        .then(({ fullAddress, simplifiedAddress }) => {
-          setLocation(fullAddress, simplifiedAddress);
+        .then(({ fullAddress: reverseFullAddress, simplifiedAddress: reverseSimplifiedAddress, district }) => {
+          if (!isHongKong(lat, lng) || hkCoords.x < 800000 || hkCoords.x > 860000 || hkCoords.y < 800000 || hkCoords.y > 850000) {
+            console.log('坐標超出香港範圍或非香港地區：', hkCoords);
+            setLocation(reverseFullAddress, reverseSimplifiedAddress); // 使用 Nominatim 結果
+          } else {
+            fetchHKLocation(hkCoords.x, hkCoords.y, reverseFullAddress, district)
+              .then(data => console.log('HK API 結果：', data))
+              .catch(err => console.error('地點查詢錯誤：', err));
+          }
         })
-        .catch(err => console.error('地理編碼錯誤：', err));
+        .catch(err => {
+          console.error('地理編碼錯誤：', err);
+          setLocation('未知地址', '未知地點');
+        });
     },
   });
 
@@ -103,6 +210,21 @@ function ReportFound() {
     validateField(name, type === 'checkbox' ? checked : value);
   };
 
+  // 處理 react-select 的品種選擇
+  const handleBreedChange = (selectedOption) => {
+    const value = selectedOption ? selectedOption.value : '';
+    setFormData(prev => ({ ...prev, breed: value }));
+    validateField('breed', value);
+  };
+
+  // 根據 petType 動態生成品種選項
+  const breedOptions = formData.petType
+    ? (formData.petType === 'cat' ? catBreeds : dogBreeds).map(breed => ({
+        value: breed.value,
+        label: breed.label,
+      }))
+    : [];
+    
   const validateField = (name, value) => {
     const newErrors = { ...errors };
     if (name === 'reportername' && !value) {
@@ -239,6 +361,16 @@ function ReportFound() {
     }
   };
 
+  const handleQuickInput = (text) => {
+    setFormData(prev => {
+      const newDetails = prev.found_details ? `${prev.found_details}, ${text}` : text;
+      return {
+        ...prev,
+        found_details: newDetails.length > 200 ? newDetails.slice(0, 200) : newDetails,
+      };
+    });
+  };
+
   const handleReset = () => {
     setFormData(initialFormData);
     setPhotos([]);
@@ -276,7 +408,7 @@ function ReportFound() {
                 提供詳細嘅寵物特徵，幫助主人更快搵到佢哋嘅寵物。
               </p>
               <div className="columns is-multiline">
-                <div className="column is-12">
+                <div className="column is-6">
                   <div className="field">
                     <label className="label">
                       寵物種類 <span className="has-text-danger">*</span>
@@ -314,21 +446,16 @@ function ReportFound() {
                       品種 <span className="has-text-danger">*</span>
                     </label>
                     <div className="control">
-                      <div className="select is-fullwidth custom-select">
-                        <select
-                          name="breed"
-                          value={formData.breed}
-                          onChange={handleChange}
-                          disabled={!formData.petType}
-                        >
-                          <option value="">選擇品種</option>
-                          {(formData.petType === 'cat' ? catBreeds : dogBreeds).map(option => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      <Select
+                        options={breedOptions}
+                        onChange={handleBreedChange}
+                        value={breedOptions.find(option => option.value === formData.breed) || null}
+                        placeholder="選擇或輸入品種"
+                        isSearchable={true}
+                        isDisabled={!formData.petType}
+                        classNamePrefix="custom-react-select"
+                        noOptionsMessage={() => "無匹配品種"}
+                      />
                     </div>
                     {errors.breed && <p className="help is-danger">{errors.breed}</p>}
                   </div>
@@ -407,7 +534,7 @@ function ReportFound() {
                     </div>
                   </div>
                 </div>
-                <div className="column is-12">
+                <div className="column is-6">
                   <div className="field">
                     <label className="label">晶片編號</label>
                     <div className="control">
@@ -472,7 +599,7 @@ function ReportFound() {
                     </div>
                   </div>
                 </div>
-                <div className="column is-6">
+                <div className="column is-12">
                   <div className="field">
                     <label className="label">
                       發現地點 <span className="has-text-danger">*</span>
@@ -520,19 +647,54 @@ function ReportFound() {
                       </p>
                     </div>
                   </div>
+                  <div className="mt-4">
+                      <p className="is-size-6 mb-2 has-text-weight-medium">特徵</p>
+                      <div className="buttons">
+                        {detailinputs
+                          .filter(item => item.category === '特徵')
+                          .map((item, index) => (
+                            <button
+                              key={index}
+                              type="button"
+                              className="button is-small custom-quick-button mr-2 mb-2"
+                              onClick={() => handleQuickInput(item.text)}
+                            >
+                              {item.text}
+                            </button>
+                          ))}
+                      </div>
+                      <p className="is-size-6 mb-2 mt-3 has-text-weight-medium">情況</p>
+                      <div className="buttons">
+                        {detailinputs
+                          .filter(item => item.category === '情況')
+                          .map((item, index) => (
+                            <button
+                              key={index}
+                              type="button"
+                              className="button is-small custom-quick-button mr-2 mb-2"
+                              onClick={() => handleQuickInput(item.text)}
+                            >
+                              {item.text}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
                 </div>
                 <div className="column is-6">
                   <div className="field">
                     <label className="label">受理情形</label>
                     <div className="control">
-                      <input
-                        className="input is-fullwidth custom-input"
-                        type="text"
-                        name="status"
-                        value={formData.status}
-                        placeholder="受理情形（可選）"
-                        onChange={handleChange}
-                      />
+                      <div className="select is-fullwidth custom-select">
+                        <select name="status" value={formData.status} onChange={handleChange}>
+                          <option value=""> 選擇情形</option>
+                            {petstatus.map(option => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                              ))}
+                        </select>
+                      </div>
+                      {errors.foundTime && <p className="help is-danger">{errors.foundTime}</p>}
                     </div>
                   </div>
                 </div>
@@ -597,7 +759,7 @@ function ReportFound() {
                 <FaPhone className="mr-2" /> 聯絡資料
               </h2>
               <p className="help is-info mb-4">
-                請提供你嘅聯繫方式，以便我哋同主人聯繫你。
+                請提供有關聯繫方式，以便主人可以聯繫你。
               </p>
               <div className="columns is-multiline">
                 <div className="column is-6">
@@ -685,17 +847,18 @@ function ReportFound() {
                     </div>
                   </div>
                 </div>
-                <div className="column is-12">
-                  <div className="field">
-                    <label className="checkbox">
+                <div className="column is-6">
+                <div className="field is-flex is-align-items-center">
+                    <label className="custom-toggle">
                       <input
                         type="checkbox"
                         name="isPublic"
                         checked={formData.isPublic}
                         onChange={handleChange}
                       />
-                      <span className="ml-2">公開聯繫資料</span>
+                      <span className="toggle-slider"></span>
                     </label>
+                    <span className="toggle-label">公開你的聯繫資料</span>
                   </div>
                 </div>
               </div>
@@ -713,7 +876,7 @@ function ReportFound() {
             </div>
 
             {/* 固定底部欄 */}
-            <div className="custom-footer">
+            <div className="custom-submit-footer">
               <div className="buttons is-centered">
                 <button
                   className="button is-light custom-back-button"

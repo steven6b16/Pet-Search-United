@@ -8,6 +8,7 @@ import { detailinputs } from './constants/QuickInput';
 import { catBreeds, dogBreeds, petage } from './constants/PetConstants';
 import proj4 from 'proj4';
 import { FaCheckCircle, FaTimesCircle, FaLock, FaPhone, FaPaw } from 'react-icons/fa';
+import Select from 'react-select'; // 引入 react-select
 
 // 使用本地圖標
 const defaultIcon = L.icon({
@@ -152,7 +153,21 @@ function ReportLost() {
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
     validateField(name, type === 'checkbox' ? checked : value);
   };
+  // 處理 react-select 的品種選擇
+  const handleBreedChange = (selectedOption) => {
+    const value = selectedOption ? selectedOption.value : '';
+    setFormData(prev => ({ ...prev, breed: value }));
+    validateField('breed', value);
+  };
 
+  // 根據 petType 動態生成品種選項
+  const breedOptions = formData.petType
+    ? (formData.petType === 'cat' ? catBreeds : dogBreeds).map(breed => ({
+        value: breed.value,
+        label: breed.label,
+      }))
+    : [];
+    
   const validateField = (name, value) => {
     const newErrors = { ...errors };
     if (name === 'name' && !value) {
@@ -522,17 +537,18 @@ function ReportLost() {
                     </div>
                   </div>
                 </div>
-                <div className="column is-12">
-                  <div className="field">
-                    <label className="checkbox">
+                <div className="column is-6">
+                <div className="field is-flex is-align-items-center">
+                    <label className="custom-toggle">
                       <input
                         type="checkbox"
                         name="isPublic"
                         checked={formData.isPublic}
                         onChange={handleChange}
                       />
-                      <span className="ml-2">公開聯繫資料</span>
+                      <span className="toggle-slider"></span>
                     </label>
+                    <span className="toggle-label">公開你的聯繫資料</span>
                   </div>
                 </div>
               </div>
@@ -613,24 +629,22 @@ function ReportLost() {
                 </div>
                 <div className="column is-6">
                   <div className="field">
-                    <label className="label">品種</label>
+                    <label className="label">
+                      品種 <span className="has-text-danger">*</span>
+                    </label>
                     <div className="control">
-                      <div className="select is-fullwidth custom-select">
-                        <select
-                          name="breed"
-                          value={formData.breed}
-                          onChange={handleChange}
-                          disabled={!formData.petType}
-                        >
-                          <option value="">選擇品種</option>
-                          {(formData.petType === 'cat' ? catBreeds : dogBreeds).map(option => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      <Select
+                        options={breedOptions}
+                        onChange={handleBreedChange}
+                        value={breedOptions.find(option => option.value === formData.breed) || null}
+                        placeholder="選擇或輸入品種"
+                        isSearchable={true}
+                        isDisabled={!formData.petType}
+                        classNamePrefix="custom-react-select"
+                        noOptionsMessage={() => "無匹配品種"}
+                      />
                     </div>
+                    {errors.breed && <p className="help is-danger">{errors.breed}</p>}
                   </div>
                 </div>
                 <div className="column is-6">
