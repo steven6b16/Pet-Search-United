@@ -1,3 +1,9 @@
+// 寵物類型
+export const petTypes = [
+  { value: "cat", label: "貓" },
+  { value: "dog", label: "狗" },
+];
+
 export const catBreeds = [
   { value: 'abyssinian', label: '阿比西尼亞貓' },
   { value: 'aegean', label: '愛琴海貓' },
@@ -283,6 +289,61 @@ export const dogBreeds = [
   { value: 'west_highland_white_terrier', label: '西高地白㹴犬/西部高地白爹利犬' }, // 台灣用「西高地白㹴犬」，香港用「西部高地白爹利犬」
   { value: 'whippet', label: '惠比特犬' },
   { value: 'yorkshire_terrier', label: '約克夏㹴犬/約瑟爹利犬' } // 台灣用「約克夏㹴犬」，香港用「約瑟爹利犬」
+];
+
+// 花色選項
+export const catPatterns = [
+  { value: "solid", label: "單色", icon: "solid-icon" },
+  { value: "bicolor", label: "雙色", icon: "bicolor-icon" },
+  { value: "tricolor", label: "三色", icon: "tricolor-icon" },
+  { value: "tortoiseshell", label: "玳瑁色", icon: "tortoiseshell-icon" },
+  { value: "tabby", label: "虎斑", icon: "tabby-icon" },
+  { value: "pointed", label: "重點色", icon: "pointed-icon" },
+  { value: "parti", label: "花斑", icon: "parti-icon" },
+  { value: "other", label: "其他", icon: "other-icon" },
+];
+
+export const dogPatterns = [
+  { value: "solid", label: "單色", icon: "solid-icon" },
+  { value: "bicolor", label: "雙色", icon: "bicolor-icon" },
+  { value: "tricolor", label: "三色", icon: "tricolor-icon" },
+  { value: "brindle", label: "虎斑", icon: "brindle-icon" },
+  { value: "merle", label: "斑點", icon: "merle-icon" },
+  { value: "sable", label: "鞍形", icon: "sable-icon" },
+  { value: "pointed", label: "重點色", icon: "pointed-icon" },
+  { value: "parti", label: "花斑", icon: "parti-icon" },
+  { value: "other", label: "其他", icon: "other-icon" },
+];
+
+// 顏色選項（貓狗通用）
+export const petColors = [
+  { value: "black", label: "黑色", color: "#000000" },
+  { value: "white", label: "白色", color: "#FFFFFF" },
+  { value: "brown", label: "棕色", color: "#8B4513" },
+  { value: "gray", label: "灰色", color: "#808080" },
+  { value: "orange", label: "橙色", color: "#FFA500" },
+  { value: "gold", label: "金色", color: "#FFD700" },
+  { value: "cream", label: "奶油色", color: "#FFFDD0" },
+  { value: "blue", label: "藍色", color: "#4682B4" },
+  { value: "chocolate", label: "巧克力色", color: "#D2691E" },
+  { value: "lilac", label: "淡紫色", color: "#C8A2C8" },
+];
+
+// 毛型選項
+export const catCoatTypes = [
+  { value: "shorthair", label: "短毛", icon: "shorthair-icon" },
+  { value: "longhair", label: "長毛", icon: "longhair-icon" },
+  { value: "curlyhair", label: "捲毛", icon: "curlyhair-icon" },
+  { value: "hairless", label: "無毛", icon: "hairless-icon" },
+];
+
+export const dogCoatTypes = [
+  { value: "shorthair", label: "短毛", icon: "shorthair-icon" },
+  { value: "longhair", label: "長毛", icon: "longhair-icon" },
+  { value: "wirehair", label: "硬毛", icon: "wirehair-icon" },
+  { value: "curlyhair", label: "捲毛", icon: "curlyhair-icon" },
+  { value: "hairless", label: "無毛", icon: "hairless-icon" },
+  { value: "doublecoat", label: "雙層毛", icon: "doublecoat-icon" },
 ];
 
   export const petage = [
