@@ -9,6 +9,7 @@ import LostPetList from './LostPetList';
 import FoundPetList from './FoundPetList';
 import AdminDashboard from './components/AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
+import ScrollToTop from './components/ScrollToTop';
 import { catBreeds, dogBreeds } from './constants/PetConstants';
 import axios from 'axios';
 import * as reactLeaflet from 'react-leaflet';
@@ -78,6 +79,7 @@ function App() {
 
   return (
     <Router>
+      <ScrollToTop />
       <div>
         {/* Meta 標籤，SEO 優化 */}
         <head>

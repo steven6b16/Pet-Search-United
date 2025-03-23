@@ -340,6 +340,7 @@ function ReportFound() {
 
     setIsSubmitting(true);
     const formDataToSend = new FormData();
+
     const foundDateTime = `${formData.foundDate} ${formData.foundTime}`;
     for (let key in formData) {
       if (key === 'isPublic') {
@@ -412,7 +413,7 @@ function ReportFound() {
                 提供詳細嘅寵物特徵，幫助主人更快搵到佢哋嘅寵物。
               </p>
               <div className="columns is-multiline">
-                <div className="column is-6">
+                <div className="column is-3">
                   <div className="field">
                     <label className="label">
                       寵物種類 <span className="has-text-danger">*</span>
@@ -444,27 +445,7 @@ function ReportFound() {
                     {errors.petType && <p className="help is-danger">{errors.petType}</p>}
                   </div>
                 </div>
-                <div className="column is-6">
-                  <div className="field">
-                    <label className="label">
-                      品種 <span className="has-text-danger">*</span>
-                    </label>
-                    <div className="control">
-                      <Select
-                        options={breedOptions}
-                        onChange={handleBreedChange}
-                        value={breedOptions.find(option => option.value === formData.breed) || null}
-                        placeholder="選擇或輸入品種"
-                        isSearchable={true}
-                        isDisabled={!formData.petType}
-                        classNamePrefix="custom-react-select"
-                        noOptionsMessage={() => "無匹配品種"}
-                      />
-                    </div>
-                    {errors.breed && <p className="help is-danger">{errors.breed}</p>}
-                  </div>
-                </div>
-                <div className="column is-6">
+                <div className="column is-3">
                   <div className="field">
                     <label className="label">性別</label>
                     <div className="control is-flex">
@@ -491,6 +472,26 @@ function ReportFound() {
                         <img src="/icon/male.png" alt="Male" />
                       </label>
                     </div>
+                  </div>
+                </div>
+                <div className="column is-6">
+                  <div className="field">
+                    <label className="label">
+                      品種 <span className="has-text-danger">*</span>
+                    </label>
+                    <div className="control">
+                      <Select
+                        options={breedOptions}
+                        onChange={handleBreedChange}
+                        value={breedOptions.find(option => option.value === formData.breed) || null}
+                        placeholder="選擇或輸入品種"
+                        isSearchable={true}
+                        isDisabled={!formData.petType}
+                        classNamePrefix="custom-react-select"
+                        noOptionsMessage={() => "無匹配品種"}
+                      />
+                    </div>
+                    {errors.breed && <p className="help is-danger">{errors.breed}</p>}
                   </div>
                 </div>
                 <div className="column is-6">
