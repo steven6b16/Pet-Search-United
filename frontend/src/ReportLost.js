@@ -329,7 +329,7 @@ function ReportLost() {
     console.log('計算地區:', newRegion);
     setFormData(prev => ({
       ...prev,
-      found_location: latLngObj ? `${latLngObj.lat},${latLngObj.lng}` : prev.found_location,
+      location: latLngObj ? `${latLngObj.lat},${latLngObj.lng}` : prev.location,
       region: newRegion,
     }));
     setLatLng(latLngObj);
@@ -366,6 +366,9 @@ function ReportLost() {
   };
 
   const handleSubmit = async (e) => {
+     
+    console.log('提交的數據：', formData);
+    
     e.preventDefault();
     if (!validateForm()) {
       alert('請填寫所有必填字段！');
@@ -381,6 +384,8 @@ function ReportLost() {
     setIsSubmitting(true);
     const formDataToSend = new FormData();
     const lostDateTime = `${formData.lostDate} ${formData.lostTime}`;
+
+   
     for (let key in formData) {
       if (key === 'isPublic') {
         formDataToSend.append(key, formData[key] ? 1 : 0);

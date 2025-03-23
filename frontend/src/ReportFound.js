@@ -324,6 +324,7 @@ function ReportFound() {
 
     setIsSubmitting(true);
     const formDataToSend = new FormData();
+
     const foundDateTime = `${formData.foundDate} ${formData.foundTime}`;
     for (let key in formData) {
       if (key === 'isPublic') {
