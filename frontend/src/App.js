@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Route, Routes, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Link, useNavigate, useLocation } from 'react-router-dom';
 import ReportLost from './ReportLost';
 import ReportFound from './ReportFound';
 import PetDetail from './PetDetail';
@@ -15,11 +15,11 @@ import axios from 'axios';
 import * as reactLeaflet from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import './App.css';
-import { FaPaw, FaSearch, FaUser, FaSignOutAlt, FaFilter, FaPhone, FaHeart, FaShieldAlt, FaLock, FaArrowRight, FaArrowCircleRight  } from 'react-icons/fa';
+import { FaPaw, FaSearch, FaUser, FaSignOutAlt, FaFilter, FaPhone, FaHeart, FaShieldAlt, FaLock, FaArrowRight, FaArrowCircleRight, FaEdit, FaSave, FaTimes } from 'react-icons/fa';
 import { TbArrowWaveRightDown } from "react-icons/tb";
 import { RiChatUploadFill, RiChatSearchFill } from "react-icons/ri";
 
-function App() {
+function AppContent() {
   const [lostPets, setLostPets] = useState([]);
   const [foundPets, setFoundPets] = useState([]);
   const [user, setUser] = useState(null);
@@ -28,18 +28,26 @@ function App() {
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [petTypeFilter, setPetTypeFilter] = useState('');
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [editMode, setEditMode] = useState(false); // 新增編輯模式
+  const [editForm, setEditForm] = useState({ name: '', phoneNumber: '', email: '' }); // 編輯表單狀態
+  const [errors, setErrors] = useState({}); // 表單錯誤
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     if (token) {
       axios
         .get('http://localhost:3001/api/me', { headers: { Authorization: `Bearer ${token}` } })
-        .then(res => setUser(res.data))
+        .then(res => {
+          setUser(res.data);
+          setEditForm({ name: res.data.name, phoneNumber: res.data.phoneNumber || '', email: res.data.email || '' });
+        })
         .catch(() => {
           setToken('');
           localStorage.removeItem('token');
         });
     }
-
     axios
       .get('http://localhost:3001/api/lost-pets')
       .then(res => setLostPets(res.data))
@@ -53,13 +61,24 @@ function App() {
   const handleLogin = (newToken, newUser) => {
     setToken(newToken);
     setUser(newUser);
+    setEditForm({ name: newUser.name, phoneNumber: newUser.phoneNumber || '', email: newUser.email || '' });
     localStorage.setItem('token', newToken);
+  };
+
+  const handleLoginModalClose = () => {
+    setIsLoginOpen(false);
+    if (!token) {
+      setIsNavigating(true);
+      navigate(-1);
+      setTimeout(() => setIsNavigating(false), 100);
+    }
   };
 
   const handleLogout = () => {
     setToken('');
     setUser(null);
     localStorage.removeItem('token');
+    setEditMode(false);
   };
 
   const getBreedLabel = (petType, breed) => {
@@ -67,7 +86,7 @@ function App() {
     const foundBreed = breedList.find(item => item.value === breed);
     return foundBreed ? foundBreed.label : '未知品種';
   };
-  
+
   const filteredLostPets = lostPets.filter(pet => {
     const matchesSearch = (
       (pet.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
@@ -77,194 +96,283 @@ function App() {
     return matchesSearch && matchesType;
   });
 
-  return (
-    <Router>
-      <ScrollToTop />
-      <div>
-        {/* Meta 標籤，SEO 優化 */}
-        <head>
-          <title>同搜毛棄 Pet Search United - 協助您尋回走失寵物</title>
-          <meta name="description" content="同搜毛棄 Pet Search United 協助您尋回走失寵物，已幫助超過 1,000 個家庭團聚。立即報失或提供線索，尋回您的寵物！" />
-        </head>
+  // 驗證表單字段
+  const validateField = (name, value) => {
+    const newErrors = { ...errors };
+    if (name === 'name' && !value) {
+      newErrors.name = '請填寫姓名';
+    } else if (name === 'phoneNumber' && value && !/^\d{8}$/.test(value)) {
+      newErrors.phoneNumber = '請輸入有效的8位電話號碼';
+    } else if (name === 'email' && value && !/\S+@\S+\.\S+/.test(value)) {
+      newErrors.email = '請輸入有效的電郵地址';
+    } else {
+      delete newErrors[name];
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
-        {/* 導航欄 */}
-        <nav className="navbar custom-navbar">
-          <div className="navbar-brand">
-            <Link to="/" className="navbar-item">
-              {/* 確保 public/logo.png 存在 */}
-              <img src="/logo.png" alt="Pet Search United 標誌" className="navbar-logo" />
-              <span className="navbar-title">同搜毛棄 Pet Search United</span>
+  // 處理編輯表單輸入
+  const handleEditChange = (e) => {
+    const { name, value } = e.target;
+    setEditForm(prev => ({ ...prev, [name]: value }));
+    validateField(name, value);
+  };
+
+  // 提交更新資料
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    if (!validateField('name', editForm.name)) {
+      return;
+    }
+    if (editForm.phoneNumber && !validateField('phoneNumber', editForm.phoneNumber)) {
+      return;
+    }
+    if (editForm.email && !validateField('email', editForm.email)) {
+      return;
+    }
+
+    try {
+      const response = await axios.put(
+        'http://localhost:3001/api/me',
+        { name: editForm.name, phoneNumber: editForm.phoneNumber, email: editForm.email },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setUser(response.data);
+      setEditMode(false);
+      alert('資料更新成功！');
+    } catch (err) {
+      console.error('更新失敗:', err);
+      alert('更新失敗，請稍後再試！');
+    }
+  };
+
+  return (
+    <div>
+      {/* Meta 標籤略 */}
+      <head>
+        <title>同搜毛棄 Pet Search United - 協助您尋回走失寵物</title>
+        <meta name="description" content="同搜毛棄 Pet Search United 協助您尋回走失寵物，已幫助超過 1,000 個家庭團聚。立即報失或提供線索，尋回您的寵物！" />
+      </head>
+
+      {/* 導航欄略 */}
+      <nav className="navbar custom-navbar">
+        <div className="navbar-brand">
+          <Link to="/" className="navbar-item">
+            <img src="/logo.png" alt="Pet Search United 標誌" className="navbar-logo" />
+            <span className="navbar-title">同搜毛棄 Pet Search United</span>
+          </Link>
+        </div>
+        <div className="navbar-menu">
+          <div className="navbar-start">
+            <Link to="/" className="navbar-item">首頁</Link>
+            <Link to="/lost-pet-list" className="navbar-item">走失寵物列表</Link>
+            <Link to="/found-pet-list" className="navbar-item">發現寵物線索</Link>
+            <Link to="/account" className="navbar-item" onClick={() => !user && setIsLoginOpen(true)}>
+              帳戶
             </Link>
           </div>
-          <div className="navbar-menu">
-            <div className="navbar-start">
-              <Link to="/" className="navbar-item">首頁</Link>
-              <Link to="/lost-pet-list" className="navbar-item">走失寵物列表</Link>
-              <Link to="/found-pet-list" className="navbar-item">發現寵物線索</Link>
-              <Link to="/account" className="navbar-item" onClick={() => !user && setIsLoginOpen(true)}>
-                帳戶
-              </Link>
-            </div>
-            <div className="navbar-end">
-              <div className="navbar-item">
-                {user ? (
-                  <div className="user-profile">
-                    {/* 確保 public/user-avatar.png 存在 */}
-                    <img src="/user-avatar.png" alt="用戶頭像" className="user-avatar" />
-                    <span className="user-name">歡迎，{user.name}</span>
-                    <button className="button custom-logout-button" onClick={handleLogout}>
-                      <FaSignOutAlt className="mr-2" /> 登出
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <button className="button custom-login-button mr-2" onClick={() => setIsLoginOpen(true)}>
-                      登入
-                    </button>
-                    <button className="button custom-register-button" onClick={() => setIsRegisterOpen(true)}>
-                      註冊
-                    </button>
-                  </>
-                )}
-              </div>
+          <div className="navbar-end">
+            <div className="navbar-item">
+              {user ? (
+                <div className="user-profile">
+                  <img src="/user-avatar.png" alt="用戶頭像" className="user-avatar" />
+                  <span className="user-name">歡迎，{user.name}</span>
+                  <button className="button custom-logout-button" onClick={handleLogout}>
+                    <FaSignOutAlt className="mr-2" /> 登出
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button className="button custom-login-button mr-2" onClick={() => setIsLoginOpen(true)}>
+                    登入
+                  </button>
+                  <button className="button custom-register-button" onClick={() => setIsRegisterOpen(true)}>
+                    註冊
+                  </button>
+                </>
+              )}
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
 
-        {/* 主內容 */}
-        <section className="section custom-section">
-          <div className="container">
-            <Routes>
-              <Route path="/report-lost" element={<ReportLost />} />
-              <Route path="/report-found" element={<ReportFound />} />
-              <Route path="/pet/:id" element={<PetDetail />} />
-              <Route path="/lost-pet-list" element={<LostPetList />} />
-              <Route path="/found-pet-list" element={<FoundPetList />} />
-              <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-              <Route path="/account" element={
-                user ? (
-                  <div className="form-card">
-                    <h2 className="subtitle is-4 mb-4">
-                      <FaUser className="mr-2" /> 個人資料
-                    </h2>
-                    <p><strong>姓名：</strong> {user.name}</p>
-                    <p><strong>電話：</strong> {user.phoneNumber || '未提供'}</p>
-                    <p><strong>電郵：</strong> {user.email || '未提供'}</p>
+      <section className="section custom-section">
+        <div className="container">
+          <Routes>
+            <Route
+              path="/report-lost"
+              element={
+                <ProtectedRoute requireLogin={true} setIsLoginOpen={(value) => !isNavigating && setIsLoginOpen(value)}>
+                  <ReportLost />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/report-found" element={<ReportFound />} />
+            <Route path="/pet/:id" element={<PetDetail />} />
+            <Route path="/lost-pet-list" element={<LostPetList />} />
+            <Route path="/found-pet-list" element={<FoundPetList />} />
+            <Route
+              path="/admin"
+              element={<ProtectedRoute requireAdmin={true} setIsLoginOpen={setIsLoginOpen}><AdminDashboard /></ProtectedRoute>}
+            />
+            <Route path="/account" element={
+              user ? (
+                <div className="form-card">
+                  <h2 className="subtitle is-4 mb-4">
+                    <FaUser className="mr-2" /> 個人資料
+                  </h2>
+                  {editMode ? (
+                    <form onSubmit={handleUpdateProfile}>
+                      <div className="field">
+                        <label className="label">姓名 <span className="has-text-danger">*</span></label>
+                        <div className="control">
+                          <input
+                            className={`input ${errors.name ? 'is-danger' : ''}`}
+                            type="text"
+                            name="name"
+                            value={editForm.name}
+                            onChange={handleEditChange}
+                            required
+                          />
+                        </div>
+                        {errors.name && <p className="help is-danger">{errors.name}</p>}
+                      </div>
+                      <div className="field">
+                        <label className="label">電話</label>
+                        <div className="control">
+                          <input
+                            className={`input ${errors.phoneNumber ? 'is-danger' : ''}`}
+                            type="tel"
+                            name="phoneNumber"
+                            value={editForm.phoneNumber}
+                            onChange={handleEditChange}
+                            placeholder="8位電話號碼"
+                          />
+                        </div>
+                        {errors.phoneNumber && <p className="help is-danger">{errors.phoneNumber}</p>}
+                      </div>
+                      <div className="field">
+                        <label className="label">電郵</label>
+                        <div className="control">
+                          <input
+                            className={`input ${errors.email ? 'is-danger' : ''}`}
+                            type="email"
+                            name="email"
+                            value={editForm.email}
+                            onChange={handleEditChange}
+                            placeholder="電郵地址"
+                          />
+                        </div>
+                        {errors.email && <p className="help is-danger">{errors.email}</p>}
+                      </div>
+                      <div className="buttons is-right mt-4">
+                        <button
+                          type="button"
+                          className="button is-light"
+                          onClick={() => setEditMode(false)}
+                        >
+                          <FaTimes className="mr-2" /> 取消
+                        </button>
+                        <button type="submit" className="button custom-button">
+                          <FaSave className="mr-2" /> 保存
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <p><strong>姓名：</strong> {user.name}</p>
+                      <p><strong>電話：</strong> {user.phoneNumber || '未提供'}</p>
+                      <p><strong>電郵：</strong> {user.email || '未提供'}</p>
+                      <button
+                        className="button custom-button mt-4"
+                        onClick={() => setEditMode(true)}
+                      >
+                        <FaEdit className="mr-2" /> 編輯資料
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="form-card has-text-centered">
+                  <p className="is-size-5">請先登入</p>
+                  <button className="button custom-login-button mt-3" onClick={() => setIsLoginOpen(true)}>
+                    立即登入
+                  </button>
+                </div>
+              )
+            } />
+            <Route path="/" element={
+              <div>
+                <div className="hero-section has-text-centered mb-6">
+                  <div className="paw-animation">
+                    <FaPaw className="paw-icon" />
+                    <FaPaw className="paw-icon paw-delay-1" />
+                    <FaPaw className="paw-icon paw-delay-2" />
                   </div>
-                ) : (
-                  <div className="form-card has-text-centered">
-                    <p className="is-size-5">請先登入</p>
-                    <button className="button custom-login-button mt-3" onClick={() => setIsLoginOpen(true)}>
-                      立即登入
-                    </button>
-                  </div>
-                )
-              } />
-              <Route path="/" element={
-                <div>
-                  {/* 頭部區域 */}
-                  <div className="hero-section has-text-centered mb-6">
-                    <div className="paw-animation">
-                      <FaPaw className="paw-icon" />
-                      <FaPaw className="paw-icon paw-delay-1" />
-                      <FaPaw className="paw-icon paw-delay-2" />
-                    </div>
-                    <h1 className="title is-hero custom-title">
-                      尋回您的寵物，從同搜毛棄開始
-                    </h1>
-                    <p className="subtitle is-4 has-text-white">
-                      已協助超過 1,000 個家庭團聚 | 每日更新超過 50 條線索
+                  <h1 className="title is-hero custom-title">
+                    尋回您的寵物，從同搜毛棄開始
+                  </h1>
+                  <p className="subtitle is-4 has-text-white">
+                    已協助超過 1,000 個家庭團聚 | 每日更新超過 50 條線索
+                  </p>
+                  <div className="slogan-container">
+                    <p className="slogan-text">
+                      每分每秒都是團聚的希望，請立即行動！
                     </p>
-                    <div className="slogan-container">
-                      <p className="slogan-text">
-                        每分每秒都是團聚的希望，請立即行動！
-                      </p>
-                    </div>
-                    <div className="certification-badges mt-4">
-                      <span className="certification-badge mr-3">
-                        <FaPaw className="mr-2" /> 香港寵物協會認證
-                      </span>
-                      <span className="certification-badge">
-                        <FaShieldAlt className="mr-2" /> SSL 安全認證
-                      </span>
-                    </div>
-                    <Link to="/report-lost" className="button custom-button is-large mt-4" onClick={() => !user && setIsLoginOpen(true)}>
-                      立即報失
-                    </Link>
                   </div>
-
-                  {/* 快速開始引導 */}
-                  <div className="quick-start-section form-card mb-6">
-                    <h2 className="subtitle is-4 mb-4 has-text-centered">
-                      <FaPaw className="mr-2" /> 快速開始：三步尋回您的寵物
-                    </h2>
-                    <div className="columns is-multiline is-centered">
-                      <div className="column is-3 has-text-centered">
-                        <div className="quick-step">
-                        <RiChatUploadFill className="step-icon" />
-                          <h3 className="step-title">1. 報失</h3>
-                          <p className="step-description">填寫寵物資料，快速提交報失信息</p>
-                        </div>
-                      </div>
-                      <TbArrowWaveRightDown/>
-                      <div className="column is-3 has-text-centered">
-                        <div className="quick-step">
-                          <RiChatSearchFill className="step-icon" />
-                          <h3 className="step-title">2. 搜尋</h3>
-                          <p className="step-description">瀏覽線索，尋找匹配的寵物</p>
-                        </div>
-                      </div>
-                      <TbArrowWaveRightDown/>
-                      <div className="column is-3 has-text-centered">
-                        <div className="quick-step">
-                          <FaHeart className="step-icon" />
-                          <h3 className="step-title">3. 團聚</h3>
-                          <p className="step-description">聯繫提供線索者，帶寵物回家</p>
-                        </div>
-                      </div>
-                    </div>
+                  <div className="certification-badges mt-4">
+                    <span className="certification-badge mr-3">
+                      <FaPaw className="mr-2" /> 香港寵物協會認證
+                    </span>
+                    <span className="certification-badge">
+                      <FaShieldAlt className="mr-2" /> SSL 安全認證
+                    </span>
                   </div>
-
-                  {/* 主要功能按鈕 */}
-                  <div className="feature-section mb-6">
-                    <h2 className="subtitle is-4 has-text-centered mb-5">
-                      <FaPaw className="mr-2" /> 我們的服務
-                    </h2>
-                    <div className="columns is-multiline is-centered">
-                      <div className="column is-3">
-                        <Link to="/found-pet-list" className="feature-card">
-                          <FaPaw className="feature-icon" />
-                          <h3 className="feature-title">同搜線索</h3>
-                          <p className="feature-description">查看最新線索，協助寵物尋找主人</p>
-                          <FaArrowCircleRight />
-                        </Link>
-                      </div>
-                      <div className="column is-3">
-                        <Link to="/lost-pet-list" className="feature-card">
-                          <FaSearch className="feature-icon" />
-                          <h3 className="feature-title">走失列表</h3>
-                          <p className="feature-description">瀏覽走失寵物列表</p>
-                          <FaArrowCircleRight />
-                        </Link>
-                      </div>
-                      <div className="column is-3">
-                        <Link to="/report-lost" className="feature-card" onClick={() => !user && setIsLoginOpen(true)}>
-                          <FaPaw className="feature-icon" />
-                          <h3 className="feature-title">主人報失</h3>
-                          <p className="feature-description">快速報失您的寵物</p>
-                          <FaArrowCircleRight />
-                        </Link>
-                      </div>
-                      <div className="column is-3">
-                        <Link to="/report-found" className="feature-card" onClick={() => !user && setIsLoginOpen(true)}>
-                          <FaSearch className="feature-icon" />
-                          <h3 className="feature-title">提供線索</h3>
-                          <p className="feature-description">發現走失寵物？立即提交線索</p>
-                          <FaArrowCircleRight />
-                        </Link>
-                      </div>
+                  <Link to="/report-lost" className="button custom-button is-large mt-4">
+                    立即報失
+                  </Link>
+                </div>
+                <div className="feature-section mb-6">
+                  <h2 className="subtitle is-4 has-text-centered mb-5">
+                    <FaPaw className="mr-2" /> 我們的服務
+                  </h2>
+                  <div className="columns is-multiline is-centered">
+                    <div className="column is-3">
+                      <Link to="/found-pet-list" className="feature-card">
+                        <FaPaw className="feature-icon" />
+                        <h3 className="feature-title">同搜線索</h3>
+                        <p className="feature-description">查看最新線索，協助寵物尋找主人</p>
+                        <FaArrowCircleRight />
+                      </Link>
+                    </div>
+                    <div className="column is-3">
+                      <Link to="/lost-pet-list" className="feature-card">
+                        <FaSearch className="feature-icon" />
+                        <h3 className="feature-title">走失列表</h3>
+                        <p className="feature-description">瀏覽走失寵物列表</p>
+                        <FaArrowCircleRight />
+                      </Link>
+                    </div>
+                    <div className="column is-3">
+                      <Link to="/report-lost" className="feature-card">
+                        <FaPaw className="feature-icon" />
+                        <h3 className="feature-title">主人報失</h3>
+                        <p className="feature-description">快速報失您的寵物</p>
+                        <FaArrowCircleRight />
+                      </Link>
+                    </div>
+                    <div className="column is-3">
+                      <Link to="/report-found" className="feature-card">
+                        <FaSearch className="feature-icon" />
+                        <h3 className="feature-title">提供線索</h3>
+                        <p className="feature-description">發現走失寵物？立即提交線索</p>
+                        <FaArrowCircleRight />
+                      </Link>
                     </div>
                   </div>
+                </div>
+            
 
                   
                   {/* 寵物地圖 */}
@@ -572,29 +680,34 @@ function App() {
                       我們是一支熱愛動物的團隊，創立同搜毛棄的初衷是希望協助更多家庭與他們的寵物團聚。我們提供免費的報失與報料平台，並與多個動物保護組織合作，確保每隻走失寵物都有機會回家。
                     </p>
                   </div>
+       </div>
+            } />
+          </Routes>
+        </div>
+      </section>
 
-                  
-                  
-                </div>
-              } />
-            </Routes>
-          </div>
-        </section>
+      <footer className="custom-footer has-text-centered">
+        <p className="is-size-6">
+          © 2025 同搜毛棄 Pet Search United. 版權所有。
+        </p>
+        <p className="is-size-7">
+          聯繫我們：<a href="mailto:support@petsearchunited.com">support@petsearchunited.com</a> | 電話：+852 1234 5678
+        </p>
+        <p className="is-size-7 mt-2">
+          <FaLock className="mr-2" /> 我們重視您的隱私，所有信息將受到嚴格保護。
+        </p>
+      </footer>
+      <LoginModal isOpen={isLoginOpen} onClose={handleLoginModalClose} onLogin={handleLogin} />
+      <RegisterModal isOpen={isRegisterOpen} onClose={() => setIsRegisterOpen(false)} />
+    </div>
+  );
+}
 
-        <footer className="custom-footer has-text-centered">
-          <p className="is-size-6">
-                      © 2025 同搜毛棄 Pet Search United. 版權所有。
-                    </p>
-                    <p className="is-size-7">
-                      聯繫我們：<a href="mailto:support@petsearchunited.com">support@petsearchunited.com</a> | 電話：+852 1234 5678
-                    </p>
-                    <p className="is-size-7 mt-2">
-                      <FaLock className="mr-2" /> 我們重視您的隱私，所有信息將受到嚴格保護。
-                    </p>
-                  </footer>
-        <LoginModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onLogin={handleLogin} />
-        <RegisterModal isOpen={isRegisterOpen} onClose={() => setIsRegisterOpen(true)} />
-      </div>
+function App() {
+  return (
+    <Router>
+      <ScrollToTop />
+      <AppContent />
     </Router>
   );
 }
