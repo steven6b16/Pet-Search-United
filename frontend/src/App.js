@@ -289,6 +289,11 @@ function App() {
                               return (
                                 <reactLeaflet.Marker key={pet.lostId} position={[lat, lng]}>
                                   <reactLeaflet.Popup>
+                                  <img
+                                        src={`http://localhost:3001/${pet.frontPhoto.split(',')[0].split('/').pop()}`}
+                                        alt={`${pet.name} 的照片`}
+                                        className="pet-image"
+                                      />
                                     <b>{pet.name}</b><br />
                                     <Link to={`/pet/${pet.lostId}`}>查看詳情</Link>
                                   </reactLeaflet.Popup>

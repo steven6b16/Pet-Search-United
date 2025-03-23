@@ -414,34 +414,6 @@ function ReportLost() {
                 <div className="column is-6">
                   <div className="field">
                     <label className="label">
-                      寵物名稱 <span className="has-text-danger">*</span>
-                    </label>
-                    <div className="control has-icons-right">
-                      <input
-                        className={`input is-fullwidth custom-input ${errors.name ? 'is-danger' : formData.name ? 'is-success' : ''}`}
-                        type="text"
-                        name="name"
-                        value={formData.name}
-                        placeholder="寵物名稱"
-                        onChange={handleChange}
-                        required
-                      />
-                      {errors.name ? (
-                        <span className="icon is-small is-right">
-                          <FaTimesCircle className="has-text-danger" />
-                        </span>
-                      ) : formData.name ? (
-                        <span className="icon is-small is-right">
-                          <FaCheckCircle className="has-text-success" />
-                        </span>
-                      ) : null}
-                      {errors.name && <p className="help is-danger">{errors.name}</p>}
-                    </div>
-                  </div>
-                </div>
-                <div className="column is-6">
-                  <div className="field">
-                    <label className="label">
                       你的稱呼 <span className="has-text-danger">*</span>
                     </label>
                     <div className="control has-icons-right">
@@ -563,7 +535,35 @@ function ReportLost() {
                 提供詳細的寵物特徵，幫助我們更快找到你的寵物。
               </p>
               <div className="columns is-multiline">
-                <div className="column is-12">
+              <div className="column is-6">
+                  <div className="field">
+                    <label className="label">
+                      寵物名稱 <span className="has-text-danger">*</span>
+                    </label>
+                    <div className="control has-icons-right">
+                      <input
+                        className={`input is-fullwidth custom-input ${errors.name ? 'is-danger' : formData.name ? 'is-success' : ''}`}
+                        type="text"
+                        name="name"
+                        value={formData.name}
+                        placeholder="寵物名稱"
+                        onChange={handleChange}
+                        required
+                      />
+                      {errors.name ? (
+                        <span className="icon is-small is-right">
+                          <FaTimesCircle className="has-text-danger" />
+                        </span>
+                      ) : formData.name ? (
+                        <span className="icon is-small is-right">
+                          <FaCheckCircle className="has-text-success" />
+                        </span>
+                      ) : null}
+                      {errors.name && <p className="help is-danger">{errors.name}</p>}
+                    </div>
+                  </div>
+                </div>
+                <div className="column is-3">
                   <div className="field">
                     <label className="label">
                       寵物種類 <span className="has-text-danger">*</span>
@@ -595,7 +595,7 @@ function ReportLost() {
                     {errors.petType && <p className="help is-danger">{errors.petType}</p>}
                   </div>
                 </div>
-                <div className="column is-6">
+                <div className="column is-3">
                   <div className="field">
                     <label className="label">
                       性別 <span className="has-text-danger">*</span>
@@ -692,7 +692,7 @@ function ReportLost() {
                     </div>
                   </div>
                 </div>
-                <div className="column is-12">
+                <div className="column is-6">
                   <div className="field">
                     <label className="label">晶片編號</label>
                     <div className="control">
@@ -757,7 +757,7 @@ function ReportLost() {
                     </div>
                   </div>
                 </div>
-                <div className="column is-6">
+                <div className="column is-12">
                   <div className="field">
                     <label className="label">
                       遺失地點 <span className="has-text-danger">*</span>
@@ -852,7 +852,7 @@ function ReportLost() {
                 上傳寵物相片，幫助我們更準確地識別你的寵物。
               </p>
               <div className="columns is-multiline">
-                <div className="column is-12">
+                <div className="column is-6">
                   <div className="field">
                     <label className="label">寵物正面相（1 張，建議上傳）</label>
                     <div className="control">
@@ -876,7 +876,7 @@ function ReportLost() {
                     </div>
                   </div>
                 </div>
-                <div className="column is-12">
+                <div className="column is-6">
                   <div className="field">
                     <label className="label">寵物側面相（1 張，建議上傳）</label>
                     <div className="control">
