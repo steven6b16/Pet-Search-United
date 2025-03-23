@@ -45,7 +45,7 @@ function LocationMarker({ setLatLng, setLocation }) {
     return lat >= 22.15 && lat <= 22.55 && lng >= 113.85 && lng <= 114.45;
   };
 
-  const fetchHKLocation = async (x, y, reverseFullAddress, district) => {
+  const fetchHKLocation = async (x, y, reverseFullAddress, reverseSimplifiedAddress, district) => {
     const apiUrl = `https://geodata.gov.hk/gs/api/v1.0.0/identify?x=${x}&y=${y}&lang=zh`;
     try {
       const response = await fetch(apiUrl);
@@ -63,7 +63,11 @@ function LocationMarker({ setLatLng, setLocation }) {
           const cname = cleanAddress(addressInfo.cname || '');
           simplifiedAddress = `${district} ${caddress}${cname}`.trim(); // 加入 district
         }
+      }else
+      {
+        simplifiedAddress = reverseSimplifiedAddress;
       }
+
       setLocation(fullAddress, simplifiedAddress);
       return data;
     } catch (error) {
@@ -129,7 +133,7 @@ function LocationMarker({ setLatLng, setLocation }) {
             console.log('坐標超出香港範圍或非香港地區：', hkCoords);
             setLocation(reverseFullAddress, reverseSimplifiedAddress); // 使用 Nominatim 結果
           } else {
-            fetchHKLocation(hkCoords.x, hkCoords.y, reverseFullAddress, district)
+            fetchHKLocation(hkCoords.x, hkCoords.y, reverseFullAddress, reverseSimplifiedAddress, district)
               .then(data => console.log('HK API 結果：', data))
               .catch(err => console.error('地點查詢錯誤：', err));
           }
@@ -375,11 +379,11 @@ function ReportFound() {
     setFormData(initialFormData);
     setPhotos([]);
     setLatLng(null);
-    setGeoError('');
+
     setErrors({});
     document.querySelectorAll('input[type="file"]').forEach(input => (input.value = ''));
   };
-
+  
   return (
     <section className="section custom-section">
       <div className="container">
@@ -613,7 +617,7 @@ function ReportFound() {
                         自動定位
                       </button>
                       <div className="map-container">
-                        <MapContainer center={[22.3193, 114.1694]} zoom={11} style={{ height: '300px', width: '100%' }}>
+                        <MapContainer center={[22.3193, 114.1694]} zoom={11} style={{ height: '500px', width: '100%' }}>
                           <TileLayer
                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                             attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
