@@ -308,11 +308,11 @@ function FoundPetList() {
 
         {/* Leaflet 地圖 */}
         <div className="box">
-        <MapContainer center={[22.4037,114.1304]} zoom={11} style={{ height: '400px', width: '100%' }}>
+        <MapContainer center={[22.4037,114.1304]} zoom={11} style={{ height: '500px', width: '100%' }}>
             {/* 基底圖層 */}
             <TileLayer
-              url={basemapAPI}
-              attribution={attributionInfo}
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             />
             {/* 標籤圖層（中文） */}
             <TileLayer

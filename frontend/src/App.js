@@ -267,13 +267,10 @@ function App() {
                       點擊地圖上的標記，查看走失寵物的詳情。
                     </p>
                     <div className="map-container">
-                      <reactLeaflet.MapContainer center={[22.3193, 114.1694]} zoom={12} style={{ height: '450px', width: '100%' }}>
+                      <reactLeaflet.MapContainer center={[22.3193, 114.1694]} zoom={12} style={{ height: '500px', width: '100%' }}>
                         <reactLeaflet.TileLayer
-                          url="https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/basemap/wgs84/{z}/{x}/{y}.png"
-                          attribution='<a href="https://api.portal.hkmapservice.gov.hk/disclaimer" target="_blank" class="copyrightDiv">© 地圖資料由地政總署提供</a><div style="width:28px;height:28px;display:inline-flex;background:url(https://api.hkmapservice.gov.hk/mapapi/landsdlogo.jpg);background-size:28px;"></div>'
-                        />
-                        <reactLeaflet.TileLayer
-                          url="https://mapapi.geodata.gov.hk/gs/api/v1.0.0/xyz/label/hk/tc/wgs84/{z}/{x}/{y}.png"
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                          attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                         />
                         {lostPets.map(pet => {
                           if (pet.location) {

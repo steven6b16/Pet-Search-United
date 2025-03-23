@@ -363,11 +363,11 @@ function ReportFound() {
     setFormData(initialFormData);
     setPhotos([]);
     setLatLng(null);
-    setGeoError('');
+
     setErrors({});
     document.querySelectorAll('input[type="file"]').forEach(input => (input.value = ''));
   };
-
+  
   return (
     <section className="section custom-section">
       <div className="container">
@@ -606,7 +606,7 @@ function ReportFound() {
                         自動定位
                       </button>
                       <div className="map-container">
-                        <MapContainer center={[22.3193, 114.1694]} zoom={11} style={{ height: '300px', width: '100%' }}>
+                        <MapContainer center={[22.3193, 114.1694]} zoom={11} style={{ height: '500px', width: '100%' }}>
                           <TileLayer
                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                             attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
