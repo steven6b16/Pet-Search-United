@@ -26,18 +26,33 @@ const db = new sqlite3.Database('./lost_pets.db', (err) => {
 // JWT 秘鑰（實際應用中應放喺 .env 文件）
 const JWT_SECRET = 'your-secret-key-please-change-this';
 
+// 中間件：驗證 token
+const authenticateToken = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ error: '請先登入' });
+  }
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: '無效嘅 token' });
+  }
+};
+
+// 中間件：檢查是否為管理員
 const isAdmin = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
     return res.status(401).json({ error: '請先登入' });
   }
-
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     if (decoded.role !== 'admin') {
       return res.status(403).json({ error: '需要管理員權限' });
     }
-    req.user = decoded; // 將解碼後的用戶信息傳下去
+    req.user = decoded;
     next();
   } catch (err) {
     return res.status(401).json({ error: '無效嘅 token' });
@@ -161,6 +176,7 @@ db.serialize(() => {
       createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       confirmedAt TIMESTAMP,
       confirmedBy INTEGER,
+      createdBy INTEGER,
       FOREIGN KEY (lostId) REFERENCES lost_pets(lostId),
       FOREIGN KEY (foundId) REFERENCES found_pets(foundId),
       FOREIGN KEY (confirmedBy) REFERENCES users(userId),
@@ -332,22 +348,71 @@ app.post('/api/login', async (req, res) => {
   });
 });
 
-app.get('/api/me', (req, res) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) {
-    return res.status(401).json({ error: '請先登入' });
+app.get('/api/me', authenticateToken, (req, res) => {
+  db.get('SELECT userId, name, phoneNumber, email FROM users WHERE userId = ? AND isDeleted = FALSE', [req.user.userId], (err, user) => {
+    if (err || !user) {
+      return res.status(404).json({ error: '用戶不存在' });
+    }
+    res.json(user);
+  });
+});
+
+// 新增 PUT /api/me 路由：更新用戶資料
+app.put('/api/me', authenticateToken, async (req, res) => {
+  const { name, phoneNumber, email } = req.body;
+  const userId = req.user.userId;
+
+  // 驗證輸入
+  if (!name) {
+    return res.status(400).json({ error: '姓名係必填項' });
+  }
+  if (phoneNumber && !/^\d{8}$/.test(phoneNumber)) {
+    return res.status(400).json({ error: '電話號碼必須係8位數字' });
+  }
+  if (email && !/\S+@\S+\.\S+/.test(email)) {
+    return res.status(400).json({ error: '請輸入有效嘅電郵地址' });
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    db.get('SELECT userId, name, phoneNumber, email FROM users WHERE userId = ? AND isDeleted = FALSE', [decoded.userId], (err, user) => {
-      if (err || !user) {
-        return res.status(404).json({ error: '用戶不存在' });
-      }
-      res.json(user);
+    // 檢查電話或電郵是否已被其他用戶使用
+    const existingUser = await new Promise((resolve, reject) => {
+      db.get(
+        'SELECT userId FROM users WHERE (phoneNumber = ? OR email = ?) AND userId != ? AND isDeleted = FALSE',
+        [phoneNumber || null, email || null, userId],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
     });
+
+    if (existingUser) {
+      return res.status(409).json({ error: '電話號碼或電郵已被其他用戶使用' });
+    }
+
+    // 更新用戶資料
+    const stmt = db.prepare(`
+      UPDATE users 
+      SET name = ?, phoneNumber = ?, email = ?, modifiedAt = CURRENT_TIMESTAMP 
+      WHERE userId = ? AND isDeleted = FALSE
+    `);
+    stmt.run(name, phoneNumber || null, email || null, userId, (err) => {
+      if (err) {
+        console.error('更新用戶資料失敗:', err);
+        return res.status(500).json({ error: '更新資料失敗' });
+      }
+      // 返回更新後嘅資料
+      db.get('SELECT userId, name, phoneNumber, email FROM users WHERE userId = ?', [userId], (err, updatedUser) => {
+        if (err) {
+          return res.status(500).json({ error: '獲取更新後資料失敗' });
+        }
+        res.json(updatedUser);
+      });
+    });
+    stmt.finalize();
   } catch (err) {
-    res.status(401).json({ error: '無效嘅 token' });
+    console.error('更新用戶資料錯誤:', err);
+    res.status(500).json({ error: '服務器錯誤' });
   }
 });
 

@@ -5,9 +5,10 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './Reportpage.css';
 import { detailinputs } from './constants/QuickInput';
-import { catBreeds, dogBreeds, petage } from './constants/PetConstants';
+import { catBreeds, dogBreeds, petage , petstatus } from './constants/PetConstants';
 import proj4 from 'proj4';
 import { FaCheckCircle, FaTimesCircle, FaLock, FaPhone, FaPaw } from 'react-icons/fa';
+import Select from 'react-select'; // 引入 react-select
 
 // 使用本地圖標（假設圖標文件在 public 目錄下）
 const defaultIcon = L.icon({
@@ -213,6 +214,21 @@ function ReportFound() {
     validateField(name, type === 'checkbox' ? checked : value);
   };
 
+  // 處理 react-select 的品種選擇
+  const handleBreedChange = (selectedOption) => {
+    const value = selectedOption ? selectedOption.value : '';
+    setFormData(prev => ({ ...prev, breed: value }));
+    validateField('breed', value);
+  };
+
+  // 根據 petType 動態生成品種選項
+  const breedOptions = formData.petType
+    ? (formData.petType === 'cat' ? catBreeds : dogBreeds).map(breed => ({
+        value: breed.value,
+        label: breed.label,
+      }))
+    : [];
+    
   const validateField = (name, value) => {
     const newErrors = { ...errors };
     if (name === 'reportername' && !value) {
@@ -397,7 +413,7 @@ function ReportFound() {
                 提供詳細嘅寵物特徵，幫助主人更快搵到佢哋嘅寵物。
               </p>
               <div className="columns is-multiline">
-                <div className="column is-12">
+                <div className="column is-3">
                   <div className="field">
                     <label className="label">
                       寵物種類 <span className="has-text-danger">*</span>
@@ -429,32 +445,7 @@ function ReportFound() {
                     {errors.petType && <p className="help is-danger">{errors.petType}</p>}
                   </div>
                 </div>
-                <div className="column is-6">
-                  <div className="field">
-                    <label className="label">
-                      品種 <span className="has-text-danger">*</span>
-                    </label>
-                    <div className="control">
-                      <div className="select is-fullwidth custom-select">
-                        <select
-                          name="breed"
-                          value={formData.breed}
-                          onChange={handleChange}
-                          disabled={!formData.petType}
-                        >
-                          <option value="">選擇品種</option>
-                          {(formData.petType === 'cat' ? catBreeds : dogBreeds).map(option => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    {errors.breed && <p className="help is-danger">{errors.breed}</p>}
-                  </div>
-                </div>
-                <div className="column is-6">
+                <div className="column is-3">
                   <div className="field">
                     <label className="label">性別</label>
                     <div className="control is-flex">
@@ -481,6 +472,26 @@ function ReportFound() {
                         <img src="/icon/male.png" alt="Male" />
                       </label>
                     </div>
+                  </div>
+                </div>
+                <div className="column is-6">
+                  <div className="field">
+                    <label className="label">
+                      品種 <span className="has-text-danger">*</span>
+                    </label>
+                    <div className="control">
+                      <Select
+                        options={breedOptions}
+                        onChange={handleBreedChange}
+                        value={breedOptions.find(option => option.value === formData.breed) || null}
+                        placeholder="選擇或輸入品種"
+                        isSearchable={true}
+                        isDisabled={!formData.petType}
+                        classNamePrefix="custom-react-select"
+                        noOptionsMessage={() => "無匹配品種"}
+                      />
+                    </div>
+                    {errors.breed && <p className="help is-danger">{errors.breed}</p>}
                   </div>
                 </div>
                 <div className="column is-6">
@@ -528,7 +539,7 @@ function ReportFound() {
                     </div>
                   </div>
                 </div>
-                <div className="column is-12">
+                <div className="column is-6">
                   <div className="field">
                     <label className="label">晶片編號</label>
                     <div className="control">
@@ -678,14 +689,17 @@ function ReportFound() {
                   <div className="field">
                     <label className="label">受理情形</label>
                     <div className="control">
-                      <input
-                        className="input is-fullwidth custom-input"
-                        type="text"
-                        name="status"
-                        value={formData.status}
-                        placeholder="受理情形（可選）"
-                        onChange={handleChange}
-                      />
+                      <div className="select is-fullwidth custom-select">
+                        <select name="status" value={formData.status} onChange={handleChange}>
+                          <option value=""> 選擇情形</option>
+                            {petstatus.map(option => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                              ))}
+                        </select>
+                      </div>
+                      {errors.foundTime && <p className="help is-danger">{errors.foundTime}</p>}
                     </div>
                   </div>
                 </div>
@@ -750,7 +764,7 @@ function ReportFound() {
                 <FaPhone className="mr-2" /> 聯絡資料
               </h2>
               <p className="help is-info mb-4">
-                請提供你嘅聯繫方式，以便我哋同主人聯繫你。
+                請提供有關聯繫方式，以便主人可以聯繫你。
               </p>
               <div className="columns is-multiline">
                 <div className="column is-6">
@@ -838,17 +852,18 @@ function ReportFound() {
                     </div>
                   </div>
                 </div>
-                <div className="column is-12">
-                  <div className="field">
-                    <label className="checkbox">
+                <div className="column is-6">
+                <div className="field is-flex is-align-items-center">
+                    <label className="custom-toggle">
                       <input
                         type="checkbox"
                         name="isPublic"
                         checked={formData.isPublic}
                         onChange={handleChange}
                       />
-                      <span className="ml-2">公開聯繫資料</span>
+                      <span className="toggle-slider"></span>
                     </label>
+                    <span className="toggle-label">公開你的聯繫資料</span>
                   </div>
                 </div>
               </div>
@@ -866,7 +881,7 @@ function ReportFound() {
             </div>
 
             {/* 固定底部欄 */}
-            <div className="custom-footer">
+            <div className="custom-submit-footer">
               <div className="buttons is-centered">
                 <button
                   className="button is-light custom-back-button"

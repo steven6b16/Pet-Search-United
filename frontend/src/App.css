@@ -404,8 +404,9 @@ label{
 .pet-detail {
   font-size: 0.95rem;
   color: #666666;
-  margin-bottom: 8px;
+  margin-bottom: 0px !important;
   line-height: 1.6;
+  text-align: left;
 }
 
 /* 搜索與過濾 */
