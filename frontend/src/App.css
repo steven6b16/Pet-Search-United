@@ -10,6 +10,10 @@ body {
   min-height: 100vh;
 }
 
+label{
+  font-size: 1.125rem!important;
+}
+
 .container {
   padding: 0;
   margin: 0 auto;
