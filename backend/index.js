@@ -9,6 +9,7 @@ const axios = require('axios');
 const crypto = require('crypto');
 const app = express();
 const port = 3001;
+const { spawn } = require('child_process');
 
 app.use(cors());
 app.use(express.json());
@@ -116,6 +117,7 @@ db.serialize(() => {
       displayLocation TEXT,
       holding_location TEXT,
       status TEXT,
+      casestatus TEXT DEFAULT 'pending' CHECK (casestatus IN ('pending', 'active', 'rejected')),
       createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       isPublic BOOLEAN DEFAULT 0,
       isFound BOOLEAN DEFAULT 0,
@@ -183,6 +185,20 @@ db.serialize(() => {
       UNIQUE(lostId, foundId)
     )
   `);
+
+  // 檢查並添加 casestatus 欄位（如果表已存在）
+  db.all("PRAGMA table_info(found_pets)", (err, rows) => {
+    if (err) console.error('檢查 found_pets 表結構失敗:', err);
+    else {
+      const hasCaseStatus = rows.some(row => row.name === 'casestatus');
+      if (!hasCaseStatus) {
+        db.run(`ALTER TABLE found_pets ADD COLUMN casestatus TEXT DEFAULT 'pending' CHECK (casestatus IN ('pending', 'active', 'rejected'))`);
+        console.log('為 found_pets 添加 casestatus 欄位');
+      } else {
+        console.log('found_pets 已有 casestatus 欄位，跳過');
+      }
+    }
+  });
 });
 
 db.all("PRAGMA table_info(lost_pets)", (err, rows) => {
@@ -517,23 +533,87 @@ app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
     const stmt = db.prepare(`
       INSERT INTO found_pets (foundId, userId, reportername, phonePrefix, phoneNumber, email, breed, petType, gender,
       age, color, found_date, found_location, found_details, region, chipNumber, photos, fullAddress,
-      displayLocation, holding_location, status, isPublic, isFound, isDeleted, accessPin, pinExpires)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      displayLocation, holding_location, status, casestatus, isPublic, isFound, isDeleted, accessPin, pinExpires)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(foundId, userId || null, reportername, phonePrefix, phoneNumber || null, email || null, breed, petType, gender,
       age, color, found_date, found_location, found_details, region, chipNumber || null, photos, fullAddress || null,
-      displayLocation || null, holding_location || null, status || null, isPublic || 0, isFound || 0, isDeleted || 0,
+      displayLocation || null, holding_location || null, status || null, 'pending', isPublic || 0, isFound || 0, isDeleted || 0,
       accessPin, pinExpires, (err) => {
         if (err) {
           console.error('插入數據失敗:', err);
           return res.status(500).send('插入數據失敗');
         }
+      });
+      console.log('Start use Python');
+    stmt.finalize();
+
+    
+    // 調用 Python ML 程式
+    console.log('Start use Python');
+    const newPetData = {
+      foundId, petType, breed, color, found_date, found_location, found_details
+    };
+    console.log('開始調用 ML 程式');
+    const pythonProcess = spawn('D:\\Project\\Pet-Search-United\\ml\\venv\\Scripts\\python.exe', ['../ml/ml_analyze_found_pets.py', JSON.stringify(newPetData)]);    console.log('ML 程式已啟動');
+
+    let mlOutput = '';
+    pythonProcess.stdout.on('data', (data) => {
+      mlOutput += data.toString();
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      console.error('ML 程式錯誤:', data.toString());
+    });
+
+    pythonProcess.on('close', async (code) => {
+      if (code !== 0) {
+        console.error('ML 程式退出碼:', code);
+        return res.status(500).json({ error: 'ML 分析失敗' });
+      }
+
+      try {
+        const similarFoundIds = JSON.parse(mlOutput);
+        console.log('ML 分析結果:', similarFoundIds);
+
+        // 更新 casestatus 為 active
+        db.run('UPDATE found_pets SET casestatus = ? WHERE foundId = ?', ['active', foundId], (err) => {
+          if (err) {
+            console.error('更新 casestatus 失敗:', err);
+            return res.status(500).json({ error: '更新狀態失敗' });
+          }
+        });
+
+        // 如果有相似個案，加入 found_pet_groups
+        if (similarFoundIds.length > 0) {
+          const groupId = `GROUP${Date.now()}`;
+          const stmtGroup = db.prepare(`
+            INSERT INTO found_pet_groups (groupId, pendingFoundIds)
+            VALUES (?, ?)
+          `);
+          stmtGroup.run(groupId, `${foundId},${similarFoundIds.join(',')}`, (err) => {
+            if (err) {
+              console.error('創建群組失敗:', err);
+            }
+          });
+          stmtGroup.finalize();
+
+          // 更新 found_pets 的 groupId
+          db.run('UPDATE found_pets SET groupId = ? WHERE foundId = ?', [groupId, foundId]);
+          similarFoundIds.forEach((similarId) => {
+            db.run('UPDATE found_pets SET groupId = ? WHERE foundId = ?', [groupId, similarId]);
+          });
+        }
+
         if (email) {
           console.log(`發送 email 到 ${email}，PIN: ${accessPin}，報料 ID: ${foundId}`);
         }
         res.send({ foundId, accessPin });
-      });
-    stmt.finalize();
+      } catch (err) {
+        console.error('處理 ML 結果失敗:', err);
+        res.status(500).json({ error: '處理 ML 結果失敗' });
+      }
+    });
   } catch (err) {
     console.error('報料 API 錯誤:', err);
     res.status(500).send('服務器錯誤');
@@ -965,12 +1045,21 @@ app.get('/geocode', async (req, res) => {
 
 // Admin Dashboard 路由，只有 Admin 可訪問
 app.get('/api/admin/dashboard', isAdmin, (req, res) => {
-  res.json({ 
-    message: '歡迎來到 Admin Dashboard！', 
-    userId: req.user.userId,
-    role: req.user.role 
+  db.all('SELECT groupId, pendingFoundIds, createdAt FROM found_pet_groups WHERE status = "pending" AND isDeleted = 0', [], (err, rows) => {
+    if (err) {
+      console.error('獲取待確認群組失敗:', err);
+      return res.status(500).json({ error: '獲取數據失敗' });
+    }
+    res.json({ 
+      message: '歡迎來到 Admin Dashboard！', 
+      userId: req.user.userId,
+      role: req.user.role,
+      pendingGroups: rows
+    });
   });
 });
+
+
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
