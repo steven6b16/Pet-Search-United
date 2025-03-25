@@ -22,7 +22,9 @@ function PetDetail() {
   const [showUpdateForm, setShowUpdateForm] = useState(false);
   const [pendingFoundIds, setPendingFoundIds] = useState([]);
   const [selectedPendingIds, setSelectedPendingIds] = useState([]);
-  const [pendingGroupId, setPendingGroupId] = useState(null); // 存儲從 pendingFoundIds 找到的 groupId
+  const [pendingGroupId, setPendingGroupId] = useState(null);
+  const [error, setError] = useState(null); // 新增錯誤狀態
+  const [loading, setLoading] = useState(true); // 新增加載狀態
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -37,42 +39,60 @@ function PetDetail() {
     }
 
     const fetchPet = async () => {
+      setLoading(true); // 開始加載
+      setError(null); // 重置錯誤
       try {
-        let petData;
+        let petData = null;
+        // 先查 lost_pets
         try {
-          petData = await axios.get(`http://localhost:3001/api/lost-pets/${id}`);
-        } catch {
-          petData = await axios.get(`http://localhost:3001/api/found-pets/${id}`);
+          const lostResponse = await axios.get(`http://localhost:3001/api/lost-pets/${id}`);
+          petData = lostResponse.data;
+          petData.type = 'lost'; // 標記類型
+        } catch (lostErr) {
+          console.log(`未找到走失寵物 ${id}，嘗試查詢發現寵物`);
+          // 如果 lost_pets 無記錄，查 found_pets
+          try {
+            const foundResponse = await axios.get(`http://localhost:3001/api/found-pets/${id}`);
+            petData = foundResponse.data;
+            petData.type = 'found'; // 標記類型
+          } catch (foundErr) {
+            console.error('Fetch found pet failed:', foundErr);
+            throw new Error('無法找到該寵物資料');
+          }
         }
-        console.log('Pet data:', petData.data);
-        setPet(petData.data);
-        parseCoordinates(petData.data);
 
-        if (petData.data.foundId) {
+        console.log('Pet data:', petData);
+        setPet(petData);
+        parseCoordinates(petData);
+
+        if (petData.type === 'found' && petData.foundId) {
           // 獲取已確認的相關報料
-          if (petData.data.groupId) {
-            const related = await axios.get(`http://localhost:3001/api/found-pets?groupId=${petData.data.groupId}`);
+          if (petData.groupId) {
+            const related = await axios.get(`http://localhost:3001/api/found-pets?groupId=${petData.groupId}`);
             const filteredRelated = related.data.filter(
-              (p) => p.foundId !== id && p.groupId === petData.data.groupId
+              (p) => p.foundId !== id && p.groupId === petData.groupId
             );
-            console.log('Fetched related found pets:', related.data);
+            console.log('Fetched related found pets:', filteredRelated);
             setRelatedFoundPets(filteredRelated);
           } else {
             setRelatedFoundPets([]);
           }
 
           // 獲取待確認的 pendingFoundIds
-          const pendingData = await axios.get(`http://localhost:3001/api/pending-found-ids/${petData.data.foundId}`);
+          const pendingData = await axios.get(`http://localhost:3001/api/pending-found-ids/${petData.foundId}`);
           console.log('Pending data:', pendingData.data);
           setPendingGroupId(pendingData.data.groupId);
-          setPendingFoundIds(pendingData.data.pendingFoundIds);
+          setPendingFoundIds(pendingData.data.pendingFoundIds || []);
         } else {
           setRelatedFoundPets([]);
           setPendingFoundIds([]);
         }
       } catch (err) {
         console.error('Fetch pet failed:', err);
+        setError(err.message || '無法獲取寵物資料');
         setPet(null);
+      } finally {
+        setLoading(false); // 結束加載
       }
     };
     fetchPet();
@@ -89,7 +109,7 @@ function PetDetail() {
   const getSortedPositions = () => {
     const safePet = pet || {};
     const safeRelatedFoundPets = Array.isArray(relatedFoundPets) ? relatedFoundPets : [];
-    const allFoundPets = safePet.foundId ? [safePet, ...safeRelatedFoundPets] : safeRelatedFoundPets;
+    const allFoundPets = safePet.type === 'found' ? [safePet, ...safeRelatedFoundPets] : safeRelatedFoundPets;
     const validPets = allFoundPets.filter((p) => p?.found_date && p?.found_location);
     if (validPets.length === 0) return [];
     const sortedPets = validPets.sort((a, b) => new Date(a.found_date) - new Date(b.found_date));
@@ -123,7 +143,7 @@ function PetDetail() {
       setLinkFoundId('');
       const pendingData = await axios.get(`http://localhost:3001/api/pending-found-ids/${pet.foundId}`);
       setPendingGroupId(pendingData.data.groupId);
-      setPendingFoundIds(pendingData.data.pendingFoundIds);
+      setPendingFoundIds(pendingData.data.pendingFoundIds || []);
     } catch (err) {
       alert(err.response?.data?.error || '創建連結失敗');
     }
@@ -141,7 +161,7 @@ function PetDetail() {
       setShowUpdateForm(false);
       setPin('');
       const updatedPet = await axios.get(`http://localhost:3001/api/found-pets/${pet.foundId}`);
-      setPet(updatedPet.data);
+      setPet({ ...updatedPet.data, type: 'found' });
       parseCoordinates(updatedPet.data);
     } catch (err) {
       alert(err.response?.data?.error || '更新失敗');
@@ -152,7 +172,7 @@ function PetDetail() {
     const token = localStorage.getItem('token');
     if (!linkFoundId) return alert('請輸入要匹配的 ID');
     try {
-      const data = pet.lostId
+      const data = pet.type === 'lost'
         ? { lostId: pet.lostId, foundId: linkFoundId }
         : { lostId: linkFoundId, foundId: pet.foundId };
       const res = await axios.post('http://localhost:3001/api/create-pet-match', data, {
@@ -199,10 +219,10 @@ function PetDetail() {
       setRelatedFoundPets(related.data.filter((p) => p.foundId !== id && p.groupId === pendingGroupId));
       const pendingData = await axios.get(`http://localhost:3001/api/pending-found-ids/${pet.foundId}`);
       setPendingGroupId(pendingData.data.groupId);
-      setPendingFoundIds(pendingData.data.pendingFoundIds);
+      setPendingFoundIds(pendingData.data.pendingFoundIds || []);
       setSelectedPendingIds([]);
       const updatedPet = await axios.get(`http://localhost:3001/api/found-pets/${id}`);
-      setPet(updatedPet.data); // 更新 pet 以反映新的 groupId
+      setPet({ ...updatedPet.data, type: 'found' });
     } catch (err) {
       alert(err.response?.data?.error || '確認失敗');
     }
@@ -214,7 +234,9 @@ function PetDetail() {
     );
   };
 
-  if (!pet) return <div className="loading">加載中...</div>;
+  if (loading) return <div className="loading">加載中...</div>;
+  if (error) return <div className="has-text-centered">{error}</div>;
+  if (!pet) return <div className="has-text-centered">無法找到該寵物資料</div>;
 
   const images = [];
   if (pet.frontPhoto) images.push({ original: `http://localhost:3001/${pet.frontPhoto.trim()}`, thumbnail: `http://localhost:3001/${pet.frontPhoto.trim()}`, description: '正面相' });
@@ -236,7 +258,7 @@ function PetDetail() {
     images.push(...photosArray);
   }
 
-  const isLostPet = !!pet.lostId;
+  const isLostPet = pet.type === 'lost';
 
   return (
     <section className="pet-detail-section">
@@ -254,10 +276,10 @@ function PetDetail() {
           <div className="info-container">
             <div className="card">
               <h2 className="subtitle">寵物資料</h2>
-              <p><spran class="caseid">個案編號: {pet.lostId || pet.foundId}</spran> </p>
+              <p><span className="caseid">個案編號: {pet.lostId || pet.foundId}</span></p>
               <div className="info-grid">
                 {pet.name && (
-                <p><strong>寵物名稱:</strong> {pet.name || '未知'}</p>
+                  <p><strong>寵物名稱:</strong> {pet.name || '未知'}</p>
                 )}
                 {isLostPet && (
                   <>
@@ -270,14 +292,10 @@ function PetDetail() {
                   </>
                 )}
                 {pet.lost_date && (
-                  <>
                   <p><strong>遺失日期:</strong> {pet.lost_date}</p>
-                  </>
                 )}
                 {pet.found_date && (
-                  <>
                   <p><strong>發現日期:</strong> {pet.found_date}</p>
-                  </>
                 )}
                 <p><strong>地點:</strong> {pet.displayLocation || pet.location || pet.found_location || '未知'}</p>
                 <p className="details"><strong>詳情:</strong> {pet.details || pet.found_details || '無'}</p>
@@ -323,7 +341,7 @@ function PetDetail() {
                   {pet?.displayLocation || pet?.location || pet?.found_location || '未知'}
                 </Popup>
               </Marker>
-              {pet?.foundId && Array.isArray(relatedFoundPets) &&
+              {pet.type === 'found' && Array.isArray(relatedFoundPets) &&
                 relatedFoundPets.map((p, idx) => {
                   if (!p?.found_location) return null;
                   const pos = (p.found_location || '').split(',').map((coord) => parseFloat(coord.trim()));
@@ -346,68 +364,96 @@ function PetDetail() {
         )}
         {!coordinates && <p className="has-text-centered">此寵物無可用位置信息</p>}
 
-        {!coordinates && <p className="has-text-centered">此寵物無可用位置信息</p>}
-
         {/* 發現軌跡時間線 */}
-        {pet?.foundId && allPositions.length > 0 && (
-          <div className="card">
-            <h2 className="subtitle">發現軌跡</h2>
-            <div className="timeline">
-              {[...(pet.foundId ? [pet] : []), ...relatedFoundPets]
-                .sort((a, b) => new Date(a.found_date) - new Date(b.found_date))
-                .map((p) => (
-                  <a href={`/pet/${p.foundId}`}><div key={p.foundId} className="timeline-item">
-                    
-                    <p><strong>發現時間:</strong> {new Date(p.found_date).toLocaleString()}</p>
-                    <p><strong>地點:</strong> {p.displayLocation || p.found_location || '未知'}</p>
-                    <p><strong>詳情:</strong> {p.found_details || '無'}</p>
-                    <p><spran class="caseid">個案編號: {p.foundId}</spran></p>
-                  </div></a>
-                ))}
-            </div>
-            <div className="field">
-              <label className="label">連結其他報料</label>
-              <div className="control">
-                <input
-                  className="input"
-                  type="text"
-                  placeholder="輸入要連結的 foundId"
-                  value={linkFoundId}
-                  onChange={(e) => setLinkFoundId(e.target.value)}
-                />
-                <button className="button is-primary mt-2" onClick={handleLinkFoundPets}>提交連結</button>
-              </div>
-            </div>
-            {/* 確認連結 */}
-            {pet?.foundId && (
-              <div className="card">
-                <h2 className="subtitle">確認連結</h2>
-                {pendingFoundIds.length > 0 ? (
-                  <div>
-                    <p>待確認的報料：</p>
-                    {pendingFoundIds.map((foundId) => (
-                      <div key={foundId} className="field">
-                        <label className="checkbox">
-                          <input
-                            type="checkbox"
-                            checked={selectedPendingIds.includes(foundId)}
-                            onChange={() => togglePendingIdSelection(foundId)}
-                          />
-                          {foundId}
-                        </label>
+        {pet?.foundId && allPositions.length > 1 ? (
+        <div className="card">
+          <h2 className="subtitle">發現軌跡</h2>
+          <div className="timeline">
+            {[...(pet.foundId ? [pet] : []), ...relatedFoundPets]
+              .sort((a, b) => new Date(a.found_date) - new Date(b.found_date))
+              .map((p) => {
+                // 提取第一張圖片（假設 photos 是逗號分隔嘅字串）
+                const photoUrl = p.photos && p.photos.split(',')[0] 
+                  ? `http://localhost:3001/${p.photos.split(',')[0].trim()}` 
+                  : 'https://via.placeholder.com/100?text=無圖片'; // 預設佔位圖
+
+                return (
+                  <a href={`/pet/${p.foundId}`} key={p.foundId}>
+                    <div className="timeline-item">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                        {/* 圖片顯示 */}
+                        <img 
+                          src={photoUrl} 
+                          alt={`報料 ${p.foundId} 圖片`}
+                          style={{ 
+                            width: '100px', 
+                            height: '100px', 
+                            objectFit: 'cover', 
+                            borderRadius: '6px', 
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)' 
+                          }} 
+                        />
+                        {/* 文字內容 */}
+                        <div>
+                          <p><strong>發現時間:</strong> {new Date(p.found_date).toLocaleString()}</p>
+                          <p><strong>地點:</strong> {p.displayLocation || p.found_location || '未知'}</p>
+                          <p><strong>詳情:</strong> {p.found_details || '無'}</p>
+                          <p><span className="caseid">個案編號: {p.foundId}</span></p>
+                        </div>
                       </div>
-                    ))}
-                    <button className="button is-success mt-2" onClick={handleConfirmLink}>
-                      確認所選連結
-                    </button>
-                  </div>
-                ) : (
-                  <p>目前無待確認的報料</p>
-                )}
-              </div>
-            )}
+                    </div>
+                  </a>
+                );
+              })}
           </div>
-        )}
+          <div className="field">
+            <label className="label">連結其他報料</label>
+            <div className="control">
+              <input
+                className="input"
+                type="text"
+                placeholder="輸入要連結的 foundId"
+                value={linkFoundId}
+                onChange={(e) => setLinkFoundId(e.target.value)}
+              />
+              <button className="button is-primary mt-2" onClick={handleLinkFoundPets}>提交連結</button>
+            </div>
+          </div>
+          {/* 確認連結 */}
+          {pet?.foundId && (
+            <div className="card">
+              <h2 className="subtitle">確認連結</h2>
+              {pendingFoundIds.length > 0 ? (
+                <div>
+                  <p>待確認的報料：</p>
+                  {pendingFoundIds.map((foundId) => (
+                    <div key={foundId} className="field">
+                      <label className="checkbox">
+                        <input
+                          type="checkbox"
+                          checked={selectedPendingIds.includes(foundId)}
+                          onChange={() => togglePendingIdSelection(foundId)}
+                        />
+                        {foundId}
+                      </label>
+                    </div>
+                  ))}
+                  <button className="button is-success mt-2" onClick={handleConfirmLink}>
+                    確認所選連結
+                  </button>
+                </div>
+              ) : (
+                <p>目前無待確認的報料</p>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (  
+        <div className="card">
+          <h2 className="subtitle">發現軌跡</h2>
+          <p>此寵物無發現軌跡</p>
+        </div>
+      )}
 
         {/* 匹配狀態 */}
         <div className="card">
@@ -443,7 +489,7 @@ function PetDetail() {
         </div>
 
         {/* 報料更新 */}
-        {pet?.foundId && user && (
+        {pet.type === 'found' && user && (
           <div className="card">
             <h2 className="subtitle">更新報料</h2>
             <button className="button is-info" onClick={() => setShowUpdateForm(!showUpdateForm)}>
