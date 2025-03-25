@@ -96,56 +96,56 @@ function AppContent() {
     return matchesSearch && matchesType;
   });
 
-  // 驗證表單字段
-  const validateField = (name, value) => {
-    const newErrors = { ...errors };
-    if (name === 'name' && !value) {
-      newErrors.name = '請填寫姓名';
-    } else if (name === 'phoneNumber' && value && !/^\d{8}$/.test(value)) {
-      newErrors.phoneNumber = '請輸入有效的8位電話號碼';
-    } else if (name === 'email' && value && !/\S+@\S+\.\S+/.test(value)) {
-      newErrors.email = '請輸入有效的電郵地址';
-    } else {
-      delete newErrors[name];
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+// 驗證表單字段
+const validateField = (name, value) => {
+  const newErrors = { ...errors };
+  if (name === 'name' && !value) {
+    newErrors.name = '請填寫姓名';
+  } else if (name === 'phoneNumber' && value && !/^\d{8}$/.test(value)) {
+    newErrors.phoneNumber = '請輸入有效的8位電話號碼';
+  } else if (name === 'email' && value && !/\S+@\S+\.\S+/.test(value)) {
+    newErrors.email = '請輸入有效的電郵地址';
+  } else {
+    delete newErrors[name];
+  }
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
 
-  // 處理編輯表單輸入
-  const handleEditChange = (e) => {
-    const { name, value } = e.target;
-    setEditForm(prev => ({ ...prev, [name]: value }));
-    validateField(name, value);
-  };
+// 處理編輯表單輸入
+const handleEditChange = (e) => {
+  const { name, value } = e.target;
+  setEditForm(prev => ({ ...prev, [name]: value }));
+  validateField(name, value);
+};
 
-  // 提交更新資料
-  const handleUpdateProfile = async (e) => {
-    e.preventDefault();
-    if (!validateField('name', editForm.name)) {
-      return;
-    }
-    if (editForm.phoneNumber && !validateField('phoneNumber', editForm.phoneNumber)) {
-      return;
-    }
-    if (editForm.email && !validateField('email', editForm.email)) {
-      return;
-    }
+// 提交更新資料
+const handleUpdateProfile = async (e) => {
+  e.preventDefault();
+  if (!validateField('name', editForm.name)) {
+    return;
+  }
+  if (editForm.phoneNumber && !validateField('phoneNumber', editForm.phoneNumber)) {
+    return;
+  }
+  if (editForm.email && !validateField('email', editForm.email)) {
+    return;
+  }
 
-    try {
-      const response = await axios.put(
-        'http://localhost:3001/api/me',
-        { name: editForm.name, phoneNumber: editForm.phoneNumber, email: editForm.email },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setUser(response.data);
-      setEditMode(false);
-      alert('資料更新成功！');
-    } catch (err) {
-      console.error('更新失敗:', err);
-      alert('更新失敗，請稍後再試！');
-    }
-  };
+  try {
+    const response = await axios.put(
+      'http://localhost:3001/api/me',
+      { name: editForm.name, phoneNumber: editForm.phoneNumber, email: editForm.email },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    setUser(response.data);
+    setEditMode(false);
+    alert('資料更新成功！');
+  } catch (err) {
+    console.error('更新失敗:', err);
+    alert('更新失敗，請稍後再試！');
+  }
+};
 
   return (
     <div>
