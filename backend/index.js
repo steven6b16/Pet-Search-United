@@ -545,17 +545,13 @@ app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
           return res.status(500).send('插入數據失敗');
         }
       });
-      console.log('Start use Python');
     stmt.finalize();
 
-    
     // 調用 Python ML 程式
-    console.log('Start use Python');
     const newPetData = {
       foundId, petType, breed, color, found_date, found_location, found_details
     };
-    console.log('開始調用 ML 程式');
-    const pythonProcess = spawn('D:\\Project\\Pet-Search-United\\ml\\venv\\Scripts\\python.exe', ['../ml/ml_analyze_found_pets.py', JSON.stringify(newPetData)]);    console.log('ML 程式已啟動');
+    const pythonProcess = spawn('..\\ml\\venv\\Scripts\\python.exe', ['../ml/ml_analyze_found_pets.py', JSON.stringify(newPetData)]);
 
     let mlOutput = '';
     pythonProcess.stdout.on('data', (data) => {
@@ -584,24 +580,63 @@ app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
           }
         });
 
-        // 如果有相似個案，加入 found_pet_groups
+        // 如果有相似個案，檢查是否已有相關 Group
         if (similarFoundIds.length > 0) {
-          const groupId = `GROUP${Date.now()}`;
-          const stmtGroup = db.prepare(`
-            INSERT INTO found_pet_groups (groupId, pendingFoundIds)
-            VALUES (?, ?)
-          `);
-          stmtGroup.run(groupId, `${foundId},${similarFoundIds.join(',')}`, (err) => {
-            if (err) {
-              console.error('創建群組失敗:', err);
-            }
+          // 查詢是否有包含這些 similarFoundIds 的現有 Group
+          const existingGroup = await new Promise((resolve, reject) => {
+            db.get(
+              `SELECT groupId, pendingFoundIds 
+               FROM found_pet_groups 
+               WHERE isDeleted = 0 AND pendingFoundIds LIKE ? 
+               ORDER BY createdAt DESC LIMIT 1`,
+              [`%${similarFoundIds[0]}%`], // 假設第一個相似 ID 代表該組
+              (err, row) => {
+                if (err) reject(err);
+                else resolve(row);
+              }
+            );
           });
-          stmtGroup.finalize();
 
-          // 更新 found_pets 的 groupId
-          db.run('UPDATE found_pets SET groupId = ? WHERE foundId = ?', [groupId, foundId]);
-          similarFoundIds.forEach((similarId) => {
-            db.run('UPDATE found_pets SET groupId = ? WHERE foundId = ?', [groupId, similarId]);
+          let groupId;
+          if (existingGroup) {
+            // 如果已有 Group，重用該 groupId
+            groupId = existingGroup.groupId;
+            let pendingFoundIds = existingGroup.pendingFoundIds ? existingGroup.pendingFoundIds.split(',') : [];
+            if (!pendingFoundIds.includes(foundId)) {
+              pendingFoundIds.push(foundId); // 添加新 foundId
+            }
+            const updatedPendingFoundIds = [...new Set(pendingFoundIds)].join(',');
+
+            // 更新現有 Group 的 pendingFoundIds
+            db.run(
+              'UPDATE found_pet_groups SET pendingFoundIds = ? WHERE groupId = ?',
+              [updatedPendingFoundIds, groupId],
+              (err) => {
+                if (err) {
+                  console.error('更新群組失敗:', err);
+                }
+              }
+            );
+          } else {
+            // 如果沒有現有 Group，創建新 Group
+            groupId = `GROUP${Date.now()}`;
+            const stmtGroup = db.prepare(`
+              INSERT INTO found_pet_groups (groupId, pendingFoundIds)
+              VALUES (?, ?)
+            `);
+            stmtGroup.run(groupId, `${foundId},${similarFoundIds.join(',')}`, (err) => {
+              if (err) {
+                console.error('創建群組失敗:', err);
+              }
+            });
+            stmtGroup.finalize();
+          }
+
+          // 更新新 foundId 的 groupId（可選，視乎需求）
+          db.run('UPDATE found_pets SET groupId = ? WHERE foundId = ?', [groupId, foundId], (err) => {
+            if (err) {
+              console.error('更新 found_pets groupId 失敗:', err);
+            }
           });
         }
 

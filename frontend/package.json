@@ -12,6 +12,7 @@
     "cookie": "0.7.1",
     "jwt-decode": "^4.0.0",
     "leaflet": "^1.9.4",
+    "leaflet-arrowheads": "^1.4.0",
     "leaflet-defaulticon-compatibility": "^0.1.2",
     "proj4": "^2.15.0",
     "react": "^19.0.0",

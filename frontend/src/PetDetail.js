@@ -419,39 +419,40 @@ function PetDetail() {
               <button className="button is-primary mt-2" onClick={handleLinkFoundPets}>提交連結</button>
             </div>
           </div>
-          {/* 確認連結 */}
-          {pet?.foundId && (
-            <div className="card">
-              <h2 className="subtitle">確認連結</h2>
-              {pendingFoundIds.length > 0 ? (
-                <div>
-                  <p>待確認的報料：</p>
-                  {pendingFoundIds.map((foundId) => (
-                    <div key={foundId} className="field">
-                      <label className="checkbox">
-                        <input
-                          type="checkbox"
-                          checked={selectedPendingIds.includes(foundId)}
-                          onChange={() => togglePendingIdSelection(foundId)}
-                        />
-                        {foundId}
-                      </label>
-                    </div>
-                  ))}
-                  <button className="button is-success mt-2" onClick={handleConfirmLink}>
-                    確認所選連結
-                  </button>
-                </div>
-              ) : (
-                <p>目前無待確認的報料</p>
-              )}
-            </div>
-          )}
+          
         </div>
       ) : (  
         <div className="card">
           <h2 className="subtitle">發現軌跡</h2>
           <p>此寵物無發現軌跡</p>
+        </div>
+      )}
+      {/* 確認連結 */}
+      {pet?.foundId && (
+        <div className="card">
+          <h2 className="subtitle">確認連結</h2>
+          {pendingFoundIds.length > 0 ? (
+            <div>
+              <p>待確認的報料：</p>
+              {pendingFoundIds.map((foundId) => (
+                <div key={foundId} className="field">
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedPendingIds.includes(foundId)}
+                      onChange={() => togglePendingIdSelection(foundId)}
+                    />
+                    {foundId}
+                  </label>
+                </div>
+              ))}
+              <button className="button is-success mt-2" onClick={handleConfirmLink}>
+                確認所選連結
+              </button>
+            </div>
+          ) : (
+            <p>目前無待確認的報料</p>
+          )}
         </div>
       )}
 
