@@ -364,7 +364,7 @@ app.post('/api/login', async (req, res) => {
   });
 });
 
-app.get('/api/me', authenticateToken, (req, res) => {
+app.get('/api/check-is-user', authenticateToken, (req, res) => {
   db.get('SELECT userId, name, phoneNumber, email FROM users WHERE userId = ? AND isDeleted = FALSE', [req.user.userId], (err, user) => {
     if (err || !user) {
       return res.status(404).json({ error: '用戶不存在' });
@@ -374,7 +374,7 @@ app.get('/api/me', authenticateToken, (req, res) => {
 });
 
 // 新增 PUT /api/me 路由：更新用戶資料
-app.put('/api/me', authenticateToken, async (req, res) => {
+app.put('/api/update-user-info', authenticateToken, async (req, res) => {
   const { name, phoneNumber, email } = req.body;
   const userId = req.user.userId;
 
@@ -519,139 +519,156 @@ app.post('/api/report-lost', uploadFields, async (req, res) => {
   }
 });
 
+// 處理報料寵物嘅 API 端點，允許上傳最多 5 張圖片
 app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
   try {
+    // 從請求中提取報料數據
     const { userId, reportername, phonePrefix, phoneNumber, email, breed, petType, gender,
       age, color, found_date, found_location, found_details, region, chipNumber, fullAddress,
       displayLocation, holding_location, status, isPublic, isFound, isDeleted } = req.body;
+    
+    // 將上傳嘅圖片路徑合併為逗號分隔嘅字符串
     const photos = req.files.map(file => file.path).join(',');
+    
+    // 生成唯一嘅 foundId（例如 HK-found20250301）
     const foundId = await generateId('found', region);
 
+    // 生成 6 位數嘅訪問 PIN 碼，用於非註冊用戶更新報料
     const accessPin = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // 設置 PIN 碼過期時間（30 天後）
     const pinExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    const stmt = db.prepare(`
-      INSERT INTO found_pets (foundId, userId, reportername, phonePrefix, phoneNumber, email, breed, petType, gender,
-      age, color, found_date, found_location, found_details, region, chipNumber, photos, fullAddress,
-      displayLocation, holding_location, status, casestatus, isPublic, isFound, isDeleted, accessPin, pinExpires)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run(foundId, userId || null, reportername, phonePrefix, phoneNumber || null, email || null, breed, petType, gender,
-      age, color, found_date, found_location, found_details, region, chipNumber || null, photos, fullAddress || null,
-      displayLocation || null, holding_location || null, status || null, 'pending', isPublic || 0, isFound || 0, isDeleted || 0,
-      accessPin, pinExpires, (err) => {
+    // 插入新報料記錄到 found_pets 表
+    await new Promise((resolve, reject) => {
+      const stmt = db.prepare(`
+        INSERT INTO found_pets (foundId, userId, reportername, phonePrefix, phoneNumber, email, breed, petType, gender,
+        age, color, found_date, found_location, found_details, region, chipNumber, photos, fullAddress,
+        displayLocation, holding_location, status, casestatus, isPublic, isFound, isDeleted, accessPin, pinExpires)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      stmt.run(
+        foundId, userId || null, reportername, phonePrefix, phoneNumber || null, email || null, breed, petType, gender,
+        age, color, found_date, found_location, found_details, region, chipNumber || null, photos, fullAddress || null,
+        displayLocation || null, holding_location || null, status || null, 'pending', isPublic || 0, isFound || 0, isDeleted || 0,
+        accessPin, pinExpires, (err) => {
+          if (err) {
+            console.error('插入數據失敗:', err);
+            reject(err);
+          } else {
+            resolve();
+          }
+        }
+      );
+      stmt.finalize();
+    });
+
+    // 準備 ML 分析所需嘅數據
+    const newPetData = { foundId, petType, breed, color, found_date, found_location, found_details };
+
+    // 調用 Python API 進行相似性分析，獲取相似嘅 foundId 列表
+    const response = await axios.post('http://localhost:5001/analyze', newPetData);
+    const similarFoundIds = response.data;
+    console.log('ML 分析結果:', similarFoundIds);
+
+    // 更新 found_pets 表中該記錄嘅 casestatus 為 'active'
+    await new Promise((resolve, reject) => {
+      db.run('UPDATE found_pets SET casestatus = ? WHERE foundId = ?', ['active', foundId], (err) => {
         if (err) {
-          console.error('插入數據失敗:', err);
-          return res.status(500).send('插入數據失敗');
+          console.error('更新 casestatus 失敗:', err);
+          reject(err);
+        } else {
+          resolve();
         }
       });
-    stmt.finalize();
-
-    // 調用 Python ML 程式
-    const newPetData = {
-      foundId, petType, breed, color, found_date, found_location, found_details
-    };
-    const pythonProcess = spawn('..\\ml\\venv\\Scripts\\python.exe', ['../ml/ml_analyze_found_pets.py', JSON.stringify(newPetData)]);
-
-    let mlOutput = '';
-    pythonProcess.stdout.on('data', (data) => {
-      mlOutput += data.toString();
     });
 
-    pythonProcess.stderr.on('data', (data) => {
-      console.error('ML 程式錯誤:', data.toString());
-    });
+    // 如果有相似個案（similarFoundIds 不為空），檢查或創建 Group
+    if (similarFoundIds.length > 0) {
+      // 查詢 found_pet_groups 表，檢查是否有包含 similarFoundIds 嘅現有 Group
+      const existingGroup = await new Promise((resolve, reject) => {
+        db.get(
+          `SELECT groupId, pendingFoundIds 
+           FROM found_pet_groups 
+           WHERE isDeleted = 0 AND pendingFoundIds LIKE ? 
+           ORDER BY createdAt DESC LIMIT 1`,
+          [`%${similarFoundIds[0]}%`], // 用第一個相似 ID 作為查詢條件
+          (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+          }
+        );
+      });
 
-    pythonProcess.on('close', async (code) => {
-      if (code !== 0) {
-        console.error('ML 程式退出碼:', code);
-        return res.status(500).json({ error: 'ML 分析失敗' });
+      let groupId;
+      if (existingGroup) {
+        // 如果已有 Group，重用該 groupId 並更新 pendingFoundIds
+        groupId = existingGroup.groupId;
+        let pendingFoundIds = existingGroup.pendingFoundIds ? existingGroup.pendingFoundIds.split(',') : [];
+        if (!pendingFoundIds.includes(foundId)) {
+          pendingFoundIds.push(foundId); // 將新 foundId 添加到 pendingFoundIds
+        }
+        const updatedPendingFoundIds = [...new Set(pendingFoundIds)].join(','); // 去重後轉為逗號分隔字符串
+
+        // 更新 found_pet_groups 表嘅 pendingFoundIds
+        await new Promise((resolve, reject) => {
+          db.run(
+            'UPDATE found_pet_groups SET pendingFoundIds = ? WHERE groupId = ?',
+            [updatedPendingFoundIds, groupId],
+            (err) => {
+              if (err) {
+                console.error('更新群組失敗:', err);
+                reject(err);
+              } else {
+                resolve();
+              }
+            }
+          );
+        });
+      } else {
+        // 如果無現有 Group，創建新 Group
+        groupId = `GROUP${Date.now()}`; // 生成唯一 groupId
+        await new Promise((resolve, reject) => {
+          const stmtGroup = db.prepare(`
+            INSERT INTO found_pet_groups (groupId, pendingFoundIds)
+            VALUES (?, ?)
+          `);
+          stmtGroup.run(groupId, `${foundId},${similarFoundIds.join(',')}`, (err) => {
+            if (err) {
+              console.error('創建群組失敗:', err);
+              reject(err);
+            } else {
+              resolve();
+            }
+          });
+          stmtGroup.finalize();
+        });
       }
 
-      try {
-        const similarFoundIds = JSON.parse(mlOutput);
-        console.log('ML 分析結果:', similarFoundIds);
-
-        // 更新 casestatus 為 active
-        db.run('UPDATE found_pets SET casestatus = ? WHERE foundId = ?', ['active', foundId], (err) => {
+      // 更新 found_pets 表中該記錄嘅 groupId
+      await new Promise((resolve, reject) => {
+        db.run('UPDATE found_pets SET groupId = ? WHERE foundId = ?', [groupId, foundId], (err) => {
           if (err) {
-            console.error('更新 casestatus 失敗:', err);
-            return res.status(500).json({ error: '更新狀態失敗' });
+            console.error('更新 found_pets groupId 失敗:', err);
+            reject(err);
+          } else {
+            resolve();
           }
         });
+      });
+    }
 
-        // 如果有相似個案，檢查是否已有相關 Group
-        if (similarFoundIds.length > 0) {
-          // 查詢是否有包含這些 similarFoundIds 的現有 Group
-          const existingGroup = await new Promise((resolve, reject) => {
-            db.get(
-              `SELECT groupId, pendingFoundIds 
-               FROM found_pet_groups 
-               WHERE isDeleted = 0 AND pendingFoundIds LIKE ? 
-               ORDER BY createdAt DESC LIMIT 1`,
-              [`%${similarFoundIds[0]}%`], // 假設第一個相似 ID 代表該組
-              (err, row) => {
-                if (err) reject(err);
-                else resolve(row);
-              }
-            );
-          });
+    // 如果有提供 email，記錄發送 PIN 嘅日誌（模擬發送 email）
+    if (email) {
+      console.log(`發送 email 到 ${email}，PIN: ${accessPin}，報料 ID: ${foundId}`);
+    }
 
-          let groupId;
-          if (existingGroup) {
-            // 如果已有 Group，重用該 groupId
-            groupId = existingGroup.groupId;
-            let pendingFoundIds = existingGroup.pendingFoundIds ? existingGroup.pendingFoundIds.split(',') : [];
-            if (!pendingFoundIds.includes(foundId)) {
-              pendingFoundIds.push(foundId); // 添加新 foundId
-            }
-            const updatedPendingFoundIds = [...new Set(pendingFoundIds)].join(',');
-
-            // 更新現有 Group 的 pendingFoundIds
-            db.run(
-              'UPDATE found_pet_groups SET pendingFoundIds = ? WHERE groupId = ?',
-              [updatedPendingFoundIds, groupId],
-              (err) => {
-                if (err) {
-                  console.error('更新群組失敗:', err);
-                }
-              }
-            );
-          } else {
-            // 如果沒有現有 Group，創建新 Group
-            groupId = `GROUP${Date.now()}`;
-            const stmtGroup = db.prepare(`
-              INSERT INTO found_pet_groups (groupId, pendingFoundIds)
-              VALUES (?, ?)
-            `);
-            stmtGroup.run(groupId, `${foundId},${similarFoundIds.join(',')}`, (err) => {
-              if (err) {
-                console.error('創建群組失敗:', err);
-              }
-            });
-            stmtGroup.finalize();
-          }
-
-          // 更新新 foundId 的 groupId（可選，視乎需求）
-          db.run('UPDATE found_pets SET groupId = ? WHERE foundId = ?', [groupId, foundId], (err) => {
-            if (err) {
-              console.error('更新 found_pets groupId 失敗:', err);
-            }
-          });
-        }
-
-        if (email) {
-          console.log(`發送 email 到 ${email}，PIN: ${accessPin}，報料 ID: ${foundId}`);
-        }
-        res.send({ foundId, accessPin });
-      } catch (err) {
-        console.error('處理 ML 結果失敗:', err);
-        res.status(500).json({ error: '處理 ML 結果失敗' });
-      }
-    });
+    // 返回成功回應，包含 foundId 同 accessPin
+    res.send({ foundId, accessPin });
   } catch (err) {
+    // 捕獲所有錯誤，返回 500 錯誤回應
     console.error('報料 API 錯誤:', err);
-    res.status(500).send('服務器錯誤');
+    res.status(500).json({ error: '服務器錯誤' });
   }
 });
 
@@ -1094,6 +1111,148 @@ app.get('/api/admin/dashboard', isAdmin, (req, res) => {
   });
 });
 
+// Admin 專用路由：獲取所有待確認嘅 found_pet_groups 及其相關 found_pets 資料
+app.get('/api/admin/pending-groups', isAdmin, async (req, res) => {
+  try {
+    const pendingGroups = await new Promise((resolve, reject) => {
+      db.all(
+        `SELECT groupId, pendingFoundIds 
+         FROM found_pet_groups 
+         WHERE status = 'pending' AND isDeleted = 0`,
+        [],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows);
+        }
+      );
+    });
+
+    const detailedGroups = await Promise.all(pendingGroups.map(async (group) => {
+      const foundIds = group.pendingFoundIds ? group.pendingFoundIds.split(',') : [];
+
+      // 查詢每個 foundId 對應嘅 found_pets 記錄，包含 photos 字段
+      const foundPets = await new Promise((resolve, reject) => {
+        db.all(
+          `SELECT foundId, petType, breed, color, found_date, found_location, found_details, photos 
+           FROM found_pets 
+           WHERE foundId IN (${foundIds.map(() => '?').join(',')}) AND isDeleted = 0`,
+          foundIds,
+          (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows);
+          }
+        );
+      });
+
+      return {
+        groupId: group.groupId,
+        pendingFoundIds: foundIds,
+        foundPets: foundPets // 包含圖片路徑
+      };
+    }));
+
+    res.json({ pendingGroups: detailedGroups });
+  } catch (err) {
+    console.error('獲取待確認群組失敗:', err);
+    res.status(500).json({ error: '獲取待確認群組失敗' });
+  }
+});
+
+// Admin 專用路由：確認或拒絕 found_pet_groups
+app.post('/api/admin/confirm-group', isAdmin, async (req, res) => {
+  const { groupId, selectedFoundIds, action } = req.body; // action: 'approve' 或 'reject'
+
+  // 驗證請求數據
+  if (!groupId || !selectedFoundIds || !Array.isArray(selectedFoundIds) || !['approve', 'reject'].includes(action)) {
+    return res.status(400).json({ error: '請提供 groupId, selectedFoundIds 同有效嘅 action（approve 或 reject）' });
+  }
+
+  try {
+    // 查詢該 Group 嘅當前狀態
+    const group = await new Promise((resolve, reject) => {
+      db.get(
+        `SELECT pendingFoundIds 
+         FROM found_pet_groups 
+         WHERE groupId = ? AND isDeleted = 0`,
+        [groupId],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
+
+    if (!group) {
+      return res.status(404).json({ error: '群組不存在' });
+    }
+
+    let pendingFoundIds = group.pendingFoundIds ? group.pendingFoundIds.split(',') : [];
+    const validSelectedIds = selectedFoundIds.filter(id => pendingFoundIds.includes(id));
+
+    if (validSelectedIds.length === 0) {
+      return res.status(400).json({ error: '無有效嘅待確認 foundId' });
+    }
+
+    if (action === 'approve') {
+      // 確認選擇嘅 foundId，將佢地加入 Group
+      await Promise.all(validSelectedIds.map(foundId => {
+        return new Promise((resolve, reject) => {
+          db.run(
+            'UPDATE found_pets SET groupId = ? WHERE foundId = ? AND isDeleted = 0',
+            [groupId, foundId],
+            (err) => {
+              if (err) reject(err);
+              else resolve();
+            }
+          );
+        });
+      }));
+
+      // 移除已確認嘅 foundId 從 pendingFoundIds
+      pendingFoundIds = pendingFoundIds.filter(id => !validSelectedIds.includes(id));
+      const updatedPendingFoundIds = pendingFoundIds.join(',');
+
+      // 更新 Group 狀態為 confirmed
+      await new Promise((resolve, reject) => {
+        db.run(
+          `UPDATE found_pet_groups 
+           SET status = 'confirmed', confirmedAt = CURRENT_TIMESTAMP, confirmedBy = ?, pendingFoundIds = ? 
+           WHERE groupId = ?`,
+          [req.user.userId, updatedPendingFoundIds, groupId],
+          (err) => {
+            if (err) reject(err);
+            else resolve();
+          }
+        );
+      });
+
+      res.json({ message: '群組已確認', groupId });
+    } else {
+      // 拒絕選擇嘅 foundId，移除佢地同 Group 嘅關聯
+      pendingFoundIds = pendingFoundIds.filter(id => !validSelectedIds.includes(id));
+      const updatedPendingFoundIds = pendingFoundIds.join(',');
+
+      // 更新 Group 狀態為 rejected
+      await new Promise((resolve, reject) => {
+        db.run(
+          `UPDATE found_pet_groups 
+           SET status = 'rejected', confirmedAt = CURRENT_TIMESTAMP, confirmedBy = ?, pendingFoundIds = ? 
+           WHERE groupId = ?`,
+          [req.user.userId, updatedPendingFoundIds, groupId],
+          (err) => {
+            if (err) reject(err);
+            else resolve();
+          }
+        );
+      });
+
+      res.json({ message: '群組已拒絕', groupId });
+    }
+  } catch (err) {
+    console.error('處理群組確認失敗:', err);
+    res.status(500).json({ error: '處理群組確認失敗' });
+  }
+});
 
 
 app.listen(port, () => {
