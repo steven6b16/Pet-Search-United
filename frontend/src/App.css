@@ -67,7 +67,6 @@ label{
   display: flex;
   justify-content: space-between;
   align-items: center;
-  width: 100%;
 }
 
 .navbar-start,
@@ -285,10 +284,18 @@ label{
   height: 100%;
 }
 
+.feature-card.red {
+  background: #a71d22;
+}
+
 .feature-card:hover {
   transform: scale(1.05);
   box-shadow: 0 10px 25px rgba(0, 87, 183, 0.4);
   background: #00A3E0;
+}
+
+.feature-card.red:hover {
+  background: #cb2c31;
 }
 
 .feature-icon {
@@ -412,6 +419,10 @@ label{
 /* 搜索與過濾 */
 .search-filter {
   margin-bottom: 30px;
+}
+
+.search-filter .field{
+  gap: 0.75rem;
 }
 
 .custom-input {

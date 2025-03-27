@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router-dom'; // 引入 Link 組件用於導航
 
 function AdminPage() {
   useEffect(() => {
@@ -20,6 +21,10 @@ function AdminPage() {
     <div className="container">
       <h1 className="title">Admin Dashboard</h1>
       <p>只有管理員可以看到這個頁面！</p>
+      {/* 按鈕導航到 AdminPendingGroups 頁面 */}
+      <Link to="/admin/pending-groups">
+        <button className="button">查看待確認嘅 Found Pet Groups</button>
+      </Link>
     </div>
   );
 }

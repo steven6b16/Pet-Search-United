@@ -7,7 +7,8 @@ import LoginModal from './LoginModal';
 import RegisterModal from './RegisterModal';
 import LostPetList from './LostPetList';
 import FoundPetList from './FoundPetList';
-import AdminDashboard from './components/AdminDashboard';
+import AdminDashboard from './admin/AdminDashboard';
+import AdminPendingGroups from './admin/AdminPendingGroups';
 import ProtectedRoute from './components/ProtectedRoute';
 import ScrollToTop from './components/ScrollToTop';
 import { catBreeds, dogBreeds } from './constants/PetConstants';
@@ -38,7 +39,7 @@ function AppContent() {
   useEffect(() => {
     if (token) {
       axios
-        .get('http://localhost:3001/api/me', { headers: { Authorization: `Bearer ${token}` } })
+        .get('http://localhost:3001/api/check-is-user', { headers: { Authorization: `Bearer ${token}` } })
         .then(res => {
           setUser(res.data);
           setEditForm({ name: res.data.name, phoneNumber: res.data.phoneNumber || '', email: res.data.email || '' });
@@ -134,7 +135,7 @@ const handleUpdateProfile = async (e) => {
 
   try {
     const response = await axios.put(
-      'http://localhost:3001/api/me',
+      'http://localhost:3001/api/update-user-info',
       { name: editForm.name, phoneNumber: editForm.phoneNumber, email: editForm.email },
       { headers: { Authorization: `Bearer ${token}` } }
     );
@@ -160,7 +161,7 @@ const handleUpdateProfile = async (e) => {
         <div className="navbar-brand">
           <Link to="/" className="navbar-item">
             <img src="/logo.png" alt="Pet Search United 標誌" className="navbar-logo" />
-            <span className="navbar-title">同搜毛棄 Pet Search United</span>
+            <span className="">同搜毛棄 Pet Search United</span>
           </Link>
         </div>
         <div className="navbar-menu">
@@ -168,16 +169,15 @@ const handleUpdateProfile = async (e) => {
             <Link to="/" className="navbar-item">首頁</Link>
             <Link to="/lost-pet-list" className="navbar-item">走失寵物列表</Link>
             <Link to="/found-pet-list" className="navbar-item">發現寵物線索</Link>
-            <Link to="/account" className="navbar-item" onClick={() => !user && setIsLoginOpen(true)}>
-              帳戶
-            </Link>
           </div>
-          <div className="navbar-end">
-            <div className="navbar-item">
+
               {user ? (
                 <div className="user-profile">
                   <img src="/user-avatar.png" alt="用戶頭像" className="user-avatar" />
                   <span className="user-name">歡迎，{user.name}</span>
+                  <Link to="/account" className="navbar-item" onClick={() => !user && setIsLoginOpen(true)}>
+                    帳戶
+                  </Link>
                   <button className="button custom-logout-button" onClick={handleLogout}>
                     <FaSignOutAlt className="mr-2" /> 登出
                   </button>
@@ -193,29 +193,18 @@ const handleUpdateProfile = async (e) => {
                 </>
               )}
             </div>
-          </div>
-        </div>
       </nav>
 
       <section className="section custom-section">
         <div className="container">
           <Routes>
-            <Route
-              path="/report-lost"
-              element={
-                <ProtectedRoute requireLogin={true} setIsLoginOpen={(value) => !isNavigating && setIsLoginOpen(value)}>
-                  <ReportLost />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/report-lost" element={<ProtectedRoute requireLogin={true} setIsLoginOpen={(value) => !isNavigating && setIsLoginOpen(value)}><ReportLost /></ProtectedRoute>}/>
             <Route path="/report-found" element={<ReportFound />} />
             <Route path="/pet/:id" element={<PetDetail />} />
             <Route path="/lost-pet-list" element={<LostPetList />} />
             <Route path="/found-pet-list" element={<FoundPetList />} />
-            <Route
-              path="/admin"
-              element={<ProtectedRoute requireAdmin={true} setIsLoginOpen={setIsLoginOpen}><AdminDashboard /></ProtectedRoute>}
-            />
+            <Route path="/admin" element={<ProtectedRoute requireAdmin={true} setIsLoginOpen={setIsLoginOpen}><AdminDashboard /></ProtectedRoute>} />
+            <Route path="/admin/pending-groups" element={<AdminPendingGroups />} />
             <Route path="/account" element={
               user ? (
                 <div className="form-card">
@@ -305,19 +294,15 @@ const handleUpdateProfile = async (e) => {
             <Route path="/" element={
               <div>
                 <div className="hero-section has-text-centered mb-6">
-                  <div className="paw-animation">
-                    <FaPaw className="paw-icon" />
-                    <FaPaw className="paw-icon paw-delay-1" />
-                    <FaPaw className="paw-icon paw-delay-2" />
-                  </div>
+                  
                   <h1 className="title is-hero custom-title">
                     尋回您的寵物，從同搜毛棄開始
                   </h1>
-                  <p className="subtitle is-4 has-text-white">
+                  <p className="is-size-4 has-text-centered">
                     已協助超過 1,000 個家庭團聚 | 每日更新超過 50 條線索
                   </p>
                   <div className="slogan-container">
-                    <p className="slogan-text">
+                    <p className="slogan-text has-text-black">
                       每分每秒都是團聚的希望，請立即行動！
                     </p>
                   </div>
@@ -329,14 +314,9 @@ const handleUpdateProfile = async (e) => {
                       <FaShieldAlt className="mr-2" /> SSL 安全認證
                     </span>
                   </div>
-                  <Link to="/report-lost" className="button custom-button is-large mt-4">
-                    立即報失
-                  </Link>
                 </div>
                 <div className="feature-section mb-6">
-                  <h2 className="subtitle is-4 has-text-centered mb-5">
-                    <FaPaw className="mr-2" /> 我們的服務
-                  </h2>
+                  
                   <div className="columns is-multiline is-centered">
                     <div className="column is-3">
                       <Link to="/found-pet-list" className="feature-card">
@@ -683,8 +663,11 @@ const handleUpdateProfile = async (e) => {
        </div>
             } />
           </Routes>
+         
         </div>
       </section>
+
+     
 
       <footer className="custom-footer has-text-centered">
         <p className="is-size-6">
