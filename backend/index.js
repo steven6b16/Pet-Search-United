@@ -365,7 +365,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.get('/api/check-is-user', authenticateToken, (req, res) => {
-  db.get('SELECT userId, name, phoneNumber, email FROM users WHERE userId = ? AND isDeleted = FALSE', [req.user.userId], (err, user) => {
+  db.get('SELECT userId, name, phoneNumber, email, role FROM users WHERE userId = ? AND isDeleted = FALSE', [req.user.userId], (err, user) => {
     if (err || !user) {
       return res.status(404).json({ error: '用戶不存在' });
     }
