@@ -12,7 +12,7 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
+  
     // 驗證
     if (activeTab === 'phone') {
       if (!phonePrefix) {
@@ -32,10 +32,14 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
       setError('請輸入密碼');
       return;
     }
-
+  
     try {
-      const identifier = activeTab === 'phone' ? `${phonePrefix} ${phoneNumber}` : email;
-      const res = await axios.post('http://localhost:3001/api/login', { identifier, password });
+      const identifier = activeTab === 'phone' ? phoneNumber : email;
+      const res = await axios.post('http://localhost:3001/api/login', {
+        identifier,
+        password,
+        ...(activeTab === 'phone' && { phonePrefix }), // 如果係電話登入，額外傳 phonePrefix
+      });
       onLogin(res.data.token, res.data.user);
       onClose();
     } catch (err) {

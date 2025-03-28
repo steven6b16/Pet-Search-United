@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './Reportpage.css';
 import { detailinputs } from './constants/QuickInput';
-import { catBreeds, dogBreeds, petage , petstatus } from './constants/PetConstants';
+import { catBreeds, dogBreeds, petage, petstatus } from './constants/PetConstants';
 import proj4 from 'proj4';
 import { FaCheckCircle, FaTimesCircle, FaLock, FaPhone, FaPaw } from 'react-icons/fa';
-import Select from 'react-select'; // 引入 react-select
+import Select from 'react-select';
 
 // 使用本地圖標（假設圖標文件在 public 目錄下）
 const defaultIcon = L.icon({
@@ -61,10 +61,9 @@ function LocationMarker({ setLatLng, setLocation }) {
         if (addressInfo) {
           const caddress = cleanAddress(addressInfo.caddress || '');
           const cname = cleanAddress(addressInfo.cname || '');
-          simplifiedAddress = `${district} ${caddress}${cname}`.trim(); // 加入 district
+          simplifiedAddress = `${district} ${caddress}${cname}`.trim();
         }
-      }else
-      {
+      } else {
         simplifiedAddress = reverseSimplifiedAddress;
       }
 
@@ -91,20 +90,13 @@ function LocationMarker({ setLatLng, setLocation }) {
       const fullAddress = data.display_name || '未知地址';
       const addressDetails = data.address;
 
-      // 根據地區選擇適當的 district
       let district = '';
       if (isHongKong(lat, lng)) {
-        // 香港：優先使用 suburb（如 "尖沙咀"）或 city_district（如 "油尖旺區"）addressDetails.suburb || || addressDetails.city 
-        console.log(addressDetails.suburb);
-        console.log(addressDetails.city);
-        console.log(addressDetails.city_district);
         district = addressDetails.city || '';
       } else {
-        // 台灣或其他地區：使用 city 或 county（如 "台北市" 或 "台中市"）
         district = addressDetails.city || addressDetails.county || addressDetails.town || addressDetails.suburb || '';
       }
 
-      // 構建更完整的 simplifiedAddress，包含街道和名稱
       const road = addressDetails.road || '';
       const houseNumber = addressDetails.house_number || '';
       const name = addressDetails.amenity || addressDetails.building || '';
@@ -131,7 +123,7 @@ function LocationMarker({ setLatLng, setLocation }) {
         .then(({ fullAddress: reverseFullAddress, simplifiedAddress: reverseSimplifiedAddress, district }) => {
           if (!isHongKong(lat, lng) || hkCoords.x < 800000 || hkCoords.x > 860000 || hkCoords.y < 800000 || hkCoords.y > 850000) {
             console.log('坐標超出香港範圍或非香港地區：', hkCoords);
-            setLocation(reverseFullAddress, reverseSimplifiedAddress); // 使用 Nominatim 結果
+            setLocation(reverseFullAddress, reverseSimplifiedAddress);
           } else {
             fetchHKLocation(hkCoords.x, hkCoords.y, reverseFullAddress, reverseSimplifiedAddress, district)
               .then(data => console.log('HK API 結果：', data))
@@ -164,7 +156,7 @@ async function reverseGeocode(lat, lng) {
   }
 }
 
-function ReportFound() {
+function ReportFound({ user, token }) {  // 新增 props
   const initialFormData = {
     userId: 0,
     reportername: '',
@@ -198,6 +190,19 @@ function ReportFound() {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 自動填充用戶資料
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        userId: user.userId || 0,
+        reportername: user.name || '',
+        phoneNumber: user.phoneNumber || '',
+        email: user.email || '',
+      }));
+    }
+  }, [user]);
+
   const generateTimeOptions = () => {
     const options = [];
     for (let hour = 0; hour < 24; hour++) {
@@ -214,21 +219,19 @@ function ReportFound() {
     validateField(name, type === 'checkbox' ? checked : value);
   };
 
-  // 處理 react-select 的品種選擇
   const handleBreedChange = (selectedOption) => {
     const value = selectedOption ? selectedOption.value : '';
     setFormData(prev => ({ ...prev, breed: value }));
     validateField('breed', value);
   };
 
-  // 根據 petType 動態生成品種選項
   const breedOptions = formData.petType
     ? (formData.petType === 'cat' ? catBreeds : dogBreeds).map(breed => ({
         value: breed.value,
         label: breed.label,
       }))
     : [];
-    
+
   const validateField = (name, value) => {
     const newErrors = { ...errors };
     if (name === 'reportername' && !value) {
@@ -332,7 +335,6 @@ function ReportFound() {
       return;
     }
 
-    // 提交前確認
     const confirmSubmit = window.confirm(
       `請確認以下信息：\n寵物種類：${formData.petType === 'cat' ? '貓' : '狗'}\n發現地點：${formData.displayLocation}\n聯繫電話：${formData.phonePrefix} ${formData.phoneNumber}\n確定提交？`
     );
@@ -346,7 +348,7 @@ function ReportFound() {
       if (key === 'isPublic') {
         formDataToSend.append(key, formData[key] ? 1 : 0);
       } else if (key === 'foundDate' || key === 'foundTime') {
-        // 唔單獨傳 foundDate 或 foundTime
+        // 不單獨傳 foundDate 或 foundTime
       } else {
         formDataToSend.append(key, formData[key]);
       }
@@ -355,7 +357,9 @@ function ReportFound() {
     photos.forEach(photo => formDataToSend.append('photos', photo));
 
     try {
-      const res = await axios.post('http://localhost:3001/api/report-found', formDataToSend);
+      const res = await axios.post('http://localhost:3001/api/report-found', formDataToSend, {
+        headers: { 'Authorization': `Bearer ${token}` },  // 使用 token 認證
+      });
       alert(`報料成功，ID: ${res.data.foundId}`);
       handleReset();
     } catch (err) {
@@ -380,16 +384,15 @@ function ReportFound() {
     setFormData(initialFormData);
     setPhotos([]);
     setLatLng(null);
-
+    setGeoError('');
     setErrors({});
     document.querySelectorAll('input[type="file"]').forEach(input => (input.value = ''));
   };
-  
+
   return (
     <section className="section custom-section">
       <div className="container">
         <div className="custom-form">
-          {/* 表單標題與認證徽章 */}
           <div className="header-section has-text-centered mb-6">
             <img src="/logo.png" alt="Pet Found Registry Logo" className="logo mb-4" />
             <h1 className="title is-2 custom-title">
@@ -404,7 +407,6 @@ function ReportFound() {
           </div>
 
           <form onSubmit={handleSubmit}>
-            {/* 寵物資料 */}
             <div className="form-card mb-5">
               <h2 className="subtitle is-4 mb-4">
                 <FaPaw className="mr-2" /> 寵物資料
@@ -557,7 +559,6 @@ function ReportFound() {
               </div>
             </div>
 
-            {/* 發現詳情 */}
             <div className="form-card mb-5">
               <h2 className="subtitle is-4 mb-4">
                 <FaPaw className="mr-2" /> 發現詳情
@@ -653,37 +654,37 @@ function ReportFound() {
                     </div>
                   </div>
                   <div className="mt-4">
-                      <p className="is-size-6 mb-2 has-text-weight-medium">特徵</p>
-                      <div className="buttons">
-                        {detailinputs
-                          .filter(item => item.category === '特徵')
-                          .map((item, index) => (
-                            <button
-                              key={index}
-                              type="button"
-                              className="button is-small custom-quick-button mr-2 mb-2"
-                              onClick={() => handleQuickInput(item.text)}
-                            >
-                              {item.text}
-                            </button>
-                          ))}
-                      </div>
-                      <p className="is-size-6 mb-2 mt-3 has-text-weight-medium">情況</p>
-                      <div className="buttons">
-                        {detailinputs
-                          .filter(item => item.category === '情況')
-                          .map((item, index) => (
-                            <button
-                              key={index}
-                              type="button"
-                              className="button is-small custom-quick-button mr-2 mb-2"
-                              onClick={() => handleQuickInput(item.text)}
-                            >
-                              {item.text}
-                            </button>
-                          ))}
-                      </div>
+                    <p className="is-size-6 mb-2 has-text-weight-medium">特徵</p>
+                    <div className="buttons">
+                      {detailinputs
+                        .filter(item => item.category === '特徵')
+                        .map((item, index) => (
+                          <button
+                            key={index}
+                            type="button"
+                            className="button is-small custom-quick-button mr-2 mb-2"
+                            onClick={() => handleQuickInput(item.text)}
+                          >
+                            {item.text}
+                          </button>
+                        ))}
                     </div>
+                    <p className="is-size-6 mb-2 mt-3 has-text-weight-medium">情況</p>
+                    <div className="buttons">
+                      {detailinputs
+                        .filter(item => item.category === '情況')
+                        .map((item, index) => (
+                          <button
+                            key={index}
+                            type="button"
+                            className="button is-small custom-quick-button mr-2 mb-2"
+                            onClick={() => handleQuickInput(item.text)}
+                          >
+                            {item.text}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
                 </div>
                 <div className="column is-6">
                   <div className="field">
@@ -691,15 +692,14 @@ function ReportFound() {
                     <div className="control">
                       <div className="select is-fullwidth custom-select">
                         <select name="status" value={formData.status} onChange={handleChange}>
-                          <option value=""> 選擇情形</option>
-                            {petstatus.map(option => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                              ))}
+                          <option value="">選擇情形</option>
+                          {petstatus.map(option => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
                         </select>
                       </div>
-                      {errors.foundTime && <p className="help is-danger">{errors.foundTime}</p>}
                     </div>
                   </div>
                 </div>
@@ -721,7 +721,6 @@ function ReportFound() {
               </div>
             </div>
 
-            {/* 上傳相片 */}
             <div className="form-card mb-5">
               <h2 className="subtitle is-4 mb-4">
                 <FaPaw className="mr-2" /> 上傳相片
@@ -758,7 +757,6 @@ function ReportFound() {
               </div>
             </div>
 
-            {/* 聯絡資料 */}
             <div className="form-card mb-5">
               <h2 className="subtitle is-4 mb-4">
                 <FaPhone className="mr-2" /> 聯絡資料
@@ -853,7 +851,7 @@ function ReportFound() {
                   </div>
                 </div>
                 <div className="column is-6">
-                <div className="field is-flex is-align-items-center">
+                  <div className="field is-flex is-align-items-center">
                     <label className="custom-toggle">
                       <input
                         type="checkbox"
@@ -873,14 +871,12 @@ function ReportFound() {
             <input type="hidden" name="found_location" value={formData.found_location} />
             <input type="hidden" name="fullAddress" value={formData.fullAddress} />
 
-            {/* 隱私聲明 */}
             <div className="privacy-notice has-text-centered mb-5">
               <p className="is-size-6">
                 <FaLock className="mr-2" /> 我哋重視你嘅隱私，所有信息將受到嚴格保護。
               </p>
             </div>
 
-            {/* 固定底部欄 */}
             <div className="custom-submit-footer">
               <div className="buttons is-centered">
                 <button

@@ -186,7 +186,6 @@ db.serialize(() => {
     )
   `);
 
-  // 檢查並添加 casestatus 欄位（如果表已存在）
   db.all("PRAGMA table_info(found_pets)", (err, rows) => {
     if (err) console.error('檢查 found_pets 表結構失敗:', err);
     else {
@@ -321,7 +320,7 @@ app.get('/api/verify', (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
-  const { identifier, password } = req.body;
+  const { identifier, password, phonePrefix } = req.body; // 添加 phonePrefix
   if (!identifier || !password) {
     return res.status(400).json({ error: '請輸入電話/電郵同密碼' });
   }
@@ -343,14 +342,12 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: '密碼錯誤' });
     }
 
-    // 修改這部分，加入 role
     const token = jwt.sign(
-      { userId: user.userId, role: user.role }, // 添加 role
+      { userId: user.userId, role: user.role },
       JWT_SECRET,
       { expiresIn: '1h' }
     );
     db.run('UPDATE users SET lastLoginAt = CURRENT_TIMESTAMP, failedLoginAttempts = 0 WHERE userId = ?', [user.userId]);
-    // 順便把 role 加到回應中，方便前端使用
     res.json({ 
       token, 
       user: { 
@@ -358,7 +355,7 @@ app.post('/api/login', async (req, res) => {
         name: user.name, 
         phoneNumber: user.phoneNumber, 
         email: user.email, 
-        role: user.role // 添加 role
+        role: user.role 
       } 
     });
   });
@@ -373,12 +370,10 @@ app.get('/api/check-is-user', authenticateToken, (req, res) => {
   });
 });
 
-// 新增 PUT /api/me 路由：更新用戶資料
 app.put('/api/update-user-info', authenticateToken, async (req, res) => {
   const { name, phoneNumber, email } = req.body;
   const userId = req.user.userId;
 
-  // 驗證輸入
   if (!name) {
     return res.status(400).json({ error: '姓名係必填項' });
   }
@@ -390,7 +385,6 @@ app.put('/api/update-user-info', authenticateToken, async (req, res) => {
   }
 
   try {
-    // 檢查電話或電郵是否已被其他用戶使用
     const existingUser = await new Promise((resolve, reject) => {
       db.get(
         'SELECT userId FROM users WHERE (phoneNumber = ? OR email = ?) AND userId != ? AND isDeleted = FALSE',
@@ -406,7 +400,6 @@ app.put('/api/update-user-info', authenticateToken, async (req, res) => {
       return res.status(409).json({ error: '電話號碼或電郵已被其他用戶使用' });
     }
 
-    // 更新用戶資料
     const stmt = db.prepare(`
       UPDATE users 
       SET name = ?, phoneNumber = ?, email = ?, modifiedAt = CURRENT_TIMESTAMP 
@@ -417,7 +410,6 @@ app.put('/api/update-user-info', authenticateToken, async (req, res) => {
         console.error('更新用戶資料失敗:', err);
         return res.status(500).json({ error: '更新資料失敗' });
       }
-      // 返回更新後嘅資料
       db.get('SELECT userId, name, phoneNumber, email FROM users WHERE userId = ?', [userId], (err, updatedUser) => {
         if (err) {
           return res.status(500).json({ error: '獲取更新後資料失敗' });
@@ -519,27 +511,18 @@ app.post('/api/report-lost', uploadFields, async (req, res) => {
   }
 });
 
-// 處理報料寵物嘅 API 端點，允許上傳最多 5 張圖片
 app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
   try {
-    // 從請求中提取報料數據
     const { userId, reportername, phonePrefix, phoneNumber, email, breed, petType, gender,
       age, color, found_date, found_location, found_details, region, chipNumber, fullAddress,
       displayLocation, holding_location, status, isPublic, isFound, isDeleted } = req.body;
     
-    // 將上傳嘅圖片路徑合併為逗號分隔嘅字符串
     const photos = req.files.map(file => file.path).join(',');
     
-    // 生成唯一嘅 foundId（例如 HK-found20250301）
     const foundId = await generateId('found', region);
-
-    // 生成 6 位數嘅訪問 PIN 碼，用於非註冊用戶更新報料
     const accessPin = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // 設置 PIN 碼過期時間（30 天後）
     const pinExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    // 插入新報料記錄到 found_pets 表
     await new Promise((resolve, reject) => {
       const stmt = db.prepare(`
         INSERT INTO found_pets (foundId, userId, reportername, phonePrefix, phoneNumber, email, breed, petType, gender,
@@ -563,15 +546,11 @@ app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
       stmt.finalize();
     });
 
-    // 準備 ML 分析所需嘅數據
     const newPetData = { foundId, petType, breed, color, found_date, found_location, found_details };
-
-    // 調用 Python API 進行相似性分析，獲取相似嘅 foundId 列表
     const response = await axios.post('http://localhost:5001/analyze', newPetData);
     const similarFoundIds = response.data;
     console.log('ML 分析結果:', similarFoundIds);
 
-    // 更新 found_pets 表中該記錄嘅 casestatus 為 'active'
     await new Promise((resolve, reject) => {
       db.run('UPDATE found_pets SET casestatus = ? WHERE foundId = ?', ['active', foundId], (err) => {
         if (err) {
@@ -583,16 +562,14 @@ app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
       });
     });
 
-    // 如果有相似個案（similarFoundIds 不為空），檢查或創建 Group
     if (similarFoundIds.length > 0) {
-      // 查詢 found_pet_groups 表，檢查是否有包含 similarFoundIds 嘅現有 Group
       const existingGroup = await new Promise((resolve, reject) => {
         db.get(
           `SELECT groupId, pendingFoundIds 
            FROM found_pet_groups 
            WHERE isDeleted = 0 AND pendingFoundIds LIKE ? 
            ORDER BY createdAt DESC LIMIT 1`,
-          [`%${similarFoundIds[0]}%`], // 用第一個相似 ID 作為查詢條件
+          [`%${similarFoundIds[0]}%`],
           (err, row) => {
             if (err) reject(err);
             else resolve(row);
@@ -602,15 +579,13 @@ app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
 
       let groupId;
       if (existingGroup) {
-        // 如果已有 Group，重用該 groupId 並更新 pendingFoundIds
         groupId = existingGroup.groupId;
         let pendingFoundIds = existingGroup.pendingFoundIds ? existingGroup.pendingFoundIds.split(',') : [];
         if (!pendingFoundIds.includes(foundId)) {
-          pendingFoundIds.push(foundId); // 將新 foundId 添加到 pendingFoundIds
+          pendingFoundIds.push(foundId);
         }
-        const updatedPendingFoundIds = [...new Set(pendingFoundIds)].join(','); // 去重後轉為逗號分隔字符串
+        const updatedPendingFoundIds = [...new Set(pendingFoundIds)].join(',');
 
-        // 更新 found_pet_groups 表嘅 pendingFoundIds
         await new Promise((resolve, reject) => {
           db.run(
             'UPDATE found_pet_groups SET pendingFoundIds = ? WHERE groupId = ?',
@@ -626,8 +601,7 @@ app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
           );
         });
       } else {
-        // 如果無現有 Group，創建新 Group
-        groupId = `GROUP${Date.now()}`; // 生成唯一 groupId
+        groupId = `GROUP${Date.now()}`;
         await new Promise((resolve, reject) => {
           const stmtGroup = db.prepare(`
             INSERT INTO found_pet_groups (groupId, pendingFoundIds)
@@ -645,7 +619,6 @@ app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
         });
       }
 
-      // 更新 found_pets 表中該記錄嘅 groupId
       await new Promise((resolve, reject) => {
         db.run('UPDATE found_pets SET groupId = ? WHERE foundId = ?', [groupId, foundId], (err) => {
           if (err) {
@@ -658,15 +631,12 @@ app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
       });
     }
 
-    // 如果有提供 email，記錄發送 PIN 嘅日誌（模擬發送 email）
     if (email) {
       console.log(`發送 email 到 ${email}，PIN: ${accessPin}，報料 ID: ${foundId}`);
     }
 
-    // 返回成功回應，包含 foundId 同 accessPin
     res.send({ foundId, accessPin });
   } catch (err) {
-    // 捕獲所有錯誤，返回 500 錯誤回應
     console.error('報料 API 錯誤:', err);
     res.status(500).json({ error: '服務器錯誤' });
   }
@@ -690,7 +660,6 @@ app.get('/api/lost-pets', (req, res) => {
   });
 });
 
-// 修改後的 GET /api/found-pets，支持 groupId 過濾
 app.get('/api/found-pets', (req, res) => {
   const { groupId } = req.query;
   let query = 'SELECT * FROM found_pets WHERE isDeleted = 0';
@@ -1095,7 +1064,6 @@ app.get('/geocode', async (req, res) => {
   }
 });
 
-// Admin Dashboard 路由，只有 Admin 可訪問
 app.get('/api/admin/dashboard', isAdmin, (req, res) => {
   db.all('SELECT groupId, pendingFoundIds, createdAt FROM found_pet_groups WHERE status = "pending" AND isDeleted = 0', [], (err, rows) => {
     if (err) {
@@ -1111,7 +1079,6 @@ app.get('/api/admin/dashboard', isAdmin, (req, res) => {
   });
 });
 
-// Admin 專用路由：獲取所有待確認嘅 found_pet_groups 及其相關 found_pets 資料
 app.get('/api/admin/pending-groups', isAdmin, async (req, res) => {
   try {
     const pendingGroups = await new Promise((resolve, reject) => {
@@ -1129,8 +1096,6 @@ app.get('/api/admin/pending-groups', isAdmin, async (req, res) => {
 
     const detailedGroups = await Promise.all(pendingGroups.map(async (group) => {
       const foundIds = group.pendingFoundIds ? group.pendingFoundIds.split(',') : [];
-
-      // 查詢每個 foundId 對應嘅 found_pets 記錄，包含 photos 字段
       const foundPets = await new Promise((resolve, reject) => {
         db.all(
           `SELECT foundId, petType, breed, color, found_date, found_location, found_details, photos 
@@ -1147,7 +1112,7 @@ app.get('/api/admin/pending-groups', isAdmin, async (req, res) => {
       return {
         groupId: group.groupId,
         pendingFoundIds: foundIds,
-        foundPets: foundPets // 包含圖片路徑
+        foundPets: foundPets
       };
     }));
 
@@ -1158,17 +1123,14 @@ app.get('/api/admin/pending-groups', isAdmin, async (req, res) => {
   }
 });
 
-// Admin 專用路由：確認或拒絕 found_pet_groups
 app.post('/api/admin/confirm-group', isAdmin, async (req, res) => {
-  const { groupId, selectedFoundIds, action } = req.body; // action: 'approve' 或 'reject'
+  const { groupId, selectedFoundIds, action } = req.body;
 
-  // 驗證請求數據
   if (!groupId || !selectedFoundIds || !Array.isArray(selectedFoundIds) || !['approve', 'reject'].includes(action)) {
     return res.status(400).json({ error: '請提供 groupId, selectedFoundIds 同有效嘅 action（approve 或 reject）' });
   }
 
   try {
-    // 查詢該 Group 嘅當前狀態
     const group = await new Promise((resolve, reject) => {
       db.get(
         `SELECT pendingFoundIds 
@@ -1194,7 +1156,6 @@ app.post('/api/admin/confirm-group', isAdmin, async (req, res) => {
     }
 
     if (action === 'approve') {
-      // 確認選擇嘅 foundId，將佢地加入 Group
       await Promise.all(validSelectedIds.map(foundId => {
         return new Promise((resolve, reject) => {
           db.run(
@@ -1208,11 +1169,9 @@ app.post('/api/admin/confirm-group', isAdmin, async (req, res) => {
         });
       }));
 
-      // 移除已確認嘅 foundId 從 pendingFoundIds
       pendingFoundIds = pendingFoundIds.filter(id => !validSelectedIds.includes(id));
       const updatedPendingFoundIds = pendingFoundIds.join(',');
 
-      // 更新 Group 狀態為 confirmed
       await new Promise((resolve, reject) => {
         db.run(
           `UPDATE found_pet_groups 
@@ -1228,11 +1187,9 @@ app.post('/api/admin/confirm-group', isAdmin, async (req, res) => {
 
       res.json({ message: '群組已確認', groupId });
     } else {
-      // 拒絕選擇嘅 foundId，移除佢地同 Group 嘅關聯
       pendingFoundIds = pendingFoundIds.filter(id => !validSelectedIds.includes(id));
       const updatedPendingFoundIds = pendingFoundIds.join(',');
 
-      // 更新 Group 狀態為 rejected
       await new Promise((resolve, reject) => {
         db.run(
           `UPDATE found_pet_groups 
@@ -1253,7 +1210,6 @@ app.post('/api/admin/confirm-group', isAdmin, async (req, res) => {
     res.status(500).json({ error: '處理群組確認失敗' });
   }
 });
-
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
