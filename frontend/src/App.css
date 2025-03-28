@@ -441,7 +441,7 @@ label{
 .custom-select select {
   border: 1px solid #0057B7 !important;
   border-radius: 8px !important;
-  padding: 12px !important;
+  padding: 8px 40px 7px 7px !important;
   font-size: 1rem !important;
   color: #333333 !important;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;

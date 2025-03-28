@@ -39,10 +39,17 @@ function AppContent() {
   useEffect(() => {
     if (token) {
       axios
-        .get('http://localhost:3001/api/check-is-user', { headers: { Authorization: `Bearer ${token}` } })
-        .then(res => {
+        .get('http://localhost:3001/api/check-is-user', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        .then((res) => {
+          //console.log('User data:', res.data); // 檢查返回嘅 user 對象
           setUser(res.data);
-          setEditForm({ name: res.data.name, phoneNumber: res.data.phoneNumber || '', email: res.data.email || '' });
+          setEditForm({
+            name: res.data.name,
+            phoneNumber: res.data.phoneNumber || '',
+            email: res.data.email || '',
+          });
         })
         .catch(() => {
           setToken('');
@@ -51,12 +58,12 @@ function AppContent() {
     }
     axios
       .get('http://localhost:3001/api/lost-pets')
-      .then(res => setLostPets(res.data))
-      .catch(err => console.error(err));
+      .then((res) => setLostPets(res.data))
+      .catch((err) => console.error(err));
     axios
       .get('http://localhost:3001/api/found-pets')
-      .then(res => setFoundPets(res.data))
-      .catch(err => console.error(err));
+      .then((res) => setFoundPets(res.data))
+      .catch((err) => console.error(err));
   }, [token]);
 
   const handleLogin = (newToken, newUser) => {
@@ -273,6 +280,13 @@ const handleUpdateProfile = async (e) => {
                       <p><strong>姓名：</strong> {user.name}</p>
                       <p><strong>電話：</strong> {user.phoneNumber || '未提供'}</p>
                       <p><strong>電郵：</strong> {user.email || '未提供'}</p>
+                      
+                      {/* 只有 Admin 角色才顯示管理員面板按鈕 */}
+                      {user.role === 'admin' && (
+                        <Link to="/admin" className="button is-info mr-4 mt-4">
+                          管理員面板
+                        </Link>
+                      )}
                       <button
                         className="button custom-button mt-4"
                         onClick={() => setEditMode(true)}

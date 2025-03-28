@@ -386,16 +386,15 @@ function ReportFound() {
   };
   
   return (
-    <section className="section custom-section">
+    <section className="section custom-section report-found">
       <div className="container">
         <div className="custom-form">
           {/* 表單標題與認證徽章 */}
           <div className="header-section has-text-centered mb-6">
-            <img src="/logo.png" alt="Pet Found Registry Logo" className="logo mb-4" />
             <h1 className="title is-2 custom-title">
               寵物尋獲緊急報料
             </h1>
-            <p className="subtitle is-5 has-text-grey">
+            <p className="is-size-4 has-text-grey has-text-center">
               由香港寵物協會認證，您的信息安全有保障
             </p>
             <div className="certification-badge mt-3">
@@ -409,7 +408,7 @@ function ReportFound() {
               <h2 className="subtitle is-4 mb-4">
                 <FaPaw className="mr-2" /> 寵物資料
               </h2>
-              <p className="help is-info mb-4">
+              <p className="help is-size-6 mb-4">
                 提供詳細嘅寵物特徵，幫助主人更快搵到佢哋嘅寵物。
               </p>
               <div className="columns is-multiline">

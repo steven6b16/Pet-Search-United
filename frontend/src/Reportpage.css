@@ -315,7 +315,7 @@
 
 /* 通用樣式 */
 .field {
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .label {
@@ -340,8 +340,8 @@
   box-sizing: border-box;
 }
 
-.control .input, .control .select select {
-  height: 48px;
+.report-found .control .input, .report-found .control .select select {
+  /*height: 48px;*/
 }
 
 .input:focus,
