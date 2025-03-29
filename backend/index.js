@@ -643,7 +643,7 @@ app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
 });
 
 app.get('/api/lost-pets', (req, res) => {
-  db.all('SELECT * FROM lost_pets WHERE isDeleted = 0', [], (err, rows) => {
+  db.all('SELECT * FROM lost_pets WHERE isDeleted = 0 ', [], (err, rows) => {
     if (err) {
       console.error('獲取走失寵物失敗:', err);
       return res.status(500).send('獲取數據失敗');
@@ -662,13 +662,15 @@ app.get('/api/lost-pets', (req, res) => {
 
 app.get('/api/found-pets', (req, res) => {
   const { groupId } = req.query;
-  let query = 'SELECT * FROM found_pets WHERE isDeleted = 0';
+  let query = 'SELECT * FROM found_pets WHERE isDeleted = 0'; // 基礎查詢，去掉 ORDER BY
   let params = [];
 
   if (groupId) {
     query += ' AND groupId = ?';
     params.push(groupId);
   }
+
+  query += ' ORDER BY createdAt DESC'; // 在所有條件後添加 ORDER BY
 
   db.all(query, params, (err, rows) => {
     if (err) {

@@ -473,20 +473,22 @@ function AppContent() {
                     </div>
                   </div>
                   <div className="column is-one-third">
-                    <div className="form-card">
-                      <h2 className="subtitle is-4 mb-4 has-text-centered">
-                        <FaPaw className="mr-2" /> 最新報料動態
-                      </h2>
-                      {foundPets.slice(0, 3).map(pet => (
+                  <div className="form-card">
+                    <h2 className="subtitle is-4 mb-4 has-text-centered">
+                      <FaPaw className="mr-2" /> 最新報料動態
+                    </h2>
+                    {foundPets.length > 0 ? (
+                      foundPets.slice(0, 3).map(pet => (
                         <div key={pet.foundId} className="notification is-light mb-3">
                           <div className="media">
                             <div className="media-left">
-                              {pet.frontPhoto ? (
+                              {pet.photos && pet.photos.split(',')[0] ? (
                                 <figure className="image is-48x48">
                                   <img
                                     src={`http://localhost:3001/${pet.photos.split(',')[0].split('/').pop()}`}
                                     alt={`${pet.petType} 的照片`}
                                     className="is-rounded"
+                                    onError={(e) => (e.target.src = '/icon/cat.png')} // 圖片加載失敗時顯示默認圖標
                                   />
                                 </figure>
                               ) : (
@@ -517,16 +519,17 @@ function AppContent() {
                             </div>
                           </div>
                         </div>
-                      ))}
-                      {foundPets.length === 0 ? (
-                        <p className="has-text-grey has-text-centered">暫無報料記錄</p>
-                      ) : (
-                        <Link to="/found-pet-list" className="button custom-button is-small mt-3">
-                          查看更多 <FaArrowRight className="ml-2" />
-                        </Link>
-                      )}
-                    </div>
+                      ))
+                    ) : (
+                      <p className="has-text-grey has-text-centered">暫無報料記錄</p>
+                    )}
+                    {foundPets.length > 3 && (
+                      <Link to="/found-pet-list" className="button custom-button is-small mt-3">
+                        查看更多 <FaArrowRight className="ml-2" />
+                      </Link>
+                    )}
                   </div>
+                </div>
                 </div>
                 <div className="form-card mb-6">
                   <h2 className="subtitle is-4 mb-4 has-text-centered">

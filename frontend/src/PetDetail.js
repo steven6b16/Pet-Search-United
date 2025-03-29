@@ -8,6 +8,7 @@ import 'leaflet/dist/leaflet.css';
 import './PetDetail.css';
 import L from 'leaflet';
 import 'leaflet-arrowheads';
+import { catBreeds, dogBreeds } from './constants/PetConstants';
 
 // 自定義組件來處理折線和箭頭
 function PolylineWithArrows({ positions }) {
@@ -114,6 +115,12 @@ function PetDetail() {
     };
     fetchPet();
   }, [id]);
+
+    const getBreedLabel = (petType, breed) => {
+      const breedList = petType === 'cat' ? catBreeds : dogBreeds;
+      const foundBreed = breedList.find(item => item.value === breed);
+      return foundBreed ? foundBreed.label : '未知品種';
+    };
 
   const parseCoordinates = (petData) => {
     const location = petData?.location || petData?.found_location;
@@ -310,7 +317,7 @@ function PetDetail() {
                 {isLostPet ? (
                   <>
                     <p><strong>種類:</strong> {pet.petType === 'cat' ? '貓' : pet.petType === 'dog' ? '狗' : pet.petType || '未知'}</p>
-                    <p><strong>品種:</strong> {pet.breed || '未知'}</p>
+                    <p><strong>品種:</strong> {getBreedLabel(pet.petType, pet.breed)}</p>
                     <p><strong>性別:</strong> {pet.gender === 'male' ? '男' : pet.gender === 'female' ? '女' : pet.gender || '未知'}</p>
                     <p><strong>年齡:</strong> {pet.age || '未知'}</p>
                     <p><strong>顏色:</strong> {pet.color || '未知'}</p>
@@ -319,7 +326,7 @@ function PetDetail() {
                 ) : (
                   <>
                     <p><strong>種類:</strong> {pet.petType === 'cat' ? '貓' : pet.petType === 'dog' ? '狗' : pet.petType || '未知'}</p>
-                    <p><strong>品種:</strong> {pet.breed || '未知'}</p>
+                    <p><strong>品種:</strong> {getBreedLabel(pet.petType, pet.breed)}</p>
                     <p><strong>性別:</strong> {pet.gender === 'male' ? '男' : pet.gender === 'female' ? '女' : pet.gender || '未知'}</p>
                     <p><strong>年齡:</strong> {pet.age || '未知'}</p>
                     <p><strong>顏色:</strong> {pet.color || '未知'}</p>
@@ -367,6 +374,16 @@ function PetDetail() {
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               />
+
+              <Marker position={coordinates}> 
+                <Popup>
+                  <b>{pet?.lostId || pet?.foundId || '未知'}</b>
+                  <br />
+                  {isLostPet ? `遺失日期: ${pet?.lost_date || '未知'}` : `發現日期: ${pet?.found_date || '未知'}`}
+                  <br />
+                  {pet?.displayLocation || pet?.location || pet?.found_location || '未知'}
+                </Popup>
+              </Marker>
 
               {/* 顯示所有標記 */}
               {allPositionsData.map((p, idx) => {

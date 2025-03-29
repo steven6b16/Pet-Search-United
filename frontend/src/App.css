@@ -496,6 +496,17 @@ label{
   background: #F5F5F5;
   border-radius: 10px;
   padding: 20px;
+  display: flex;
+  align-items: center; /* 確保圖片和文字垂直居中 */
+}
+.media-left {
+  margin-right: 15px; /* 圖片與文字間距 */
+}
+
+.image.is-48x48 img {
+  width: 48px;
+  height: 48px;
+  object-fit: cover; /* 確保圖片適應容器 */
 }
 
 /* 走失寵物列表與最新報料動態間距 */
