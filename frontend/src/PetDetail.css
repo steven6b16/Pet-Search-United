@@ -259,7 +259,7 @@
 .button.is-info,
 .button.is-primary,
 .button.is-success {
-  margin-top: 0.5rem;
+  /*margin-top: 0.5rem;*/
 }
 
 .lost-icon {
