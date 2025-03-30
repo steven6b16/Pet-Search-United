@@ -15,7 +15,7 @@ app = Flask(__name__)
 # 配置 CORS，允許前端跨域訪問
 CORS(app, resources={
     r"/upload": {"origins": "http://localhost:3000"},  # 允許前端（React）訪問貓狗識別端點
-    r"/analyze": {"origins": "http://localhost:3001"}  # 允許後端（server.js）訪問 ML 分析端點
+    r"/analyze": {"origins": "http://localhost:3001"}  # 允許後端（index.js）訪問 ML 分析端點
 })
 
 # 設置上傳圖片嘅保存路徑
@@ -77,7 +77,7 @@ def fetch_found_pets() -> pd.DataFrame:
     返回：
         pandas DataFrame，包含 foundId, petType, breed, color, found_date, found_location, found_details
     """
-    conn = sqlite3.connect('D:/Project/Pet-Search-United/backend/lost_pets.db')  # 使用絕對路徑
+    conn = sqlite3.connect('../backend/lost_pets.db')  # 使用絕對路徑
     query = """
         SELECT foundId, petType, breed, color, found_date, found_location, found_details 
         FROM found_pets 
