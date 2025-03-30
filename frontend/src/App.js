@@ -64,17 +64,31 @@ function AppContent() {
     setUser(newUser);
     setEditForm({ name: newUser.name, phoneNumber: newUser.phoneNumber || '', email: newUser.email || '' });
     localStorage.setItem('token', newToken);
+  
+    // 檢查是否有目標路徑需要跳轉
+    const redirectPath = localStorage.getItem('redirectAfterLogin');
+    if (redirectPath) {
+      localStorage.removeItem('redirectAfterLogin'); // 清除臨時存儲
+      navigate(redirectPath);
+    } else {
+      navigate('/'); // 默認跳轉到首頁
+    }
   };
 
   const handleLoginModalClose = () => {
     setIsLoginOpen(false);
-    if (!token) {
-      setIsNavigating(true);
-      navigate(-1);
-      setTimeout(() => setIsNavigating(false), 100);
-    }
   };
 
+  // 自訂點擊處理函數，檢查登入狀態
+  const handleProtectedLinkClick = (e, path) => {
+    e.preventDefault(); // 阻止默認跳轉
+    if (!user) {
+      setIsLoginOpen(true); // 未登入，顯示 LoginModal
+    } else {
+      navigate(path); // 已登入，直接跳轉
+    }
+  };
+  
   const handleLogout = () => {
     setToken('');
     setUser(null);
@@ -268,6 +282,14 @@ function AppContent() {
                       <p><strong>姓名：</strong> {user.name}</p>
                       <p><strong>電話：</strong> {user.phoneNumber || '未提供'}</p>
                       <p><strong>電郵：</strong> {user.email || '未提供'}</p>
+
+                      {/* 只有 Admin 角色才顯示管理員面板按鈕 */}
+                      {user.role === 'admin' && (
+                        <Link to="/admin" className="button is-info mr-4 mt-4">
+                          管理員面板
+                        </Link>
+                      )}
+        
                       <button
                         className="button custom-button mt-4"
                         onClick={() => setEditMode(true)}

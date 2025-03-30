@@ -74,3 +74,51 @@ p{
 .lost-pet-list .control.choice-btns button{
     width: 45%;
 }
+
+/* 分組卡片的疊牌效果 */
+.grouped-card {
+  position: relative;
+  z-index: 1;
+}
+
+.grouped-card::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 100%;
+  height: 100%;
+  background: hsl(221, 14%, 98%);
+  z-index: -1;
+  border-radius: 10px;
+}
+
+.grouped-card:hover::before {
+  transform: translateY(-5px);
+  transition: transform 0.4s ease;
+}
+
+.grouped-card::after {
+  content: '';
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 100%;
+  height: 100%;
+  background: #eef0f3;
+  z-index: -2;
+  border-radius: 10px;
+}
+
+.grouped-card:hover::after {
+  transform: translateY(-5px);
+  transition: transform 0.8s ease;
+}
+
+/* GROUPED 標籤定位到右上角 */
+.grouped-tag {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2; /* 確保標籤在疊牌之上 */
+}
