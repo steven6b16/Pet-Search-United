@@ -11,6 +11,8 @@ import AdminDashboard from './admin/AdminDashboard';
 import AdminPendingGroups from './admin/AdminPendingGroups';
 import ProtectedRoute from './components/ProtectedRoute';
 import ScrollToTop from './components/ScrollToTop';
+import UserLostReports from './user/UserLostReports';
+import UserFoundReports from './user/UserFoundReports';
 import { catBreeds, dogBreeds } from './constants/PetConstants';
 import axios from 'axios';
 import * as reactLeaflet from 'react-leaflet';
@@ -19,6 +21,7 @@ import './App.css';
 import { FaPaw, FaSearch, FaUser, FaSignOutAlt, FaFilter, FaPhone, FaHeart, FaShieldAlt, FaLock, FaArrowRight, FaArrowCircleRight, FaEdit, FaSave, FaTimes } from 'react-icons/fa';
 import { TbArrowWaveRightDown } from "react-icons/tb";
 import { RiChatUploadFill, RiChatSearchFill } from "react-icons/ri";
+import { Helmet } from 'react-helmet';
 
 function AppContent() {
   const [lostPets, setLostPets] = useState([]);
@@ -29,7 +32,6 @@ function AppContent() {
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [petTypeFilter, setPetTypeFilter] = useState('');
-  const [isNavigating, setIsNavigating] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', phoneNumber: '', email: '' });
   const [errors, setErrors] = useState({});
@@ -44,20 +46,27 @@ function AppContent() {
           setUser(res.data);
           setEditForm({ name: res.data.name, phoneNumber: res.data.phoneNumber || '', email: res.data.email || '' });
         })
-        .catch(() => {
+        .catch(err => {
+          console.error('檢查用戶身份失敗:', err);
           setToken('');
+          setUser(null);
           localStorage.removeItem('token');
+          if (location.pathname.startsWith('/account') || location.pathname === '/report-lost') {
+            setIsLoginOpen(true);
+          }
         });
     }
+
     axios
       .get('http://localhost:3001/api/lost-pets')
       .then(res => setLostPets(res.data))
-      .catch(err => console.error(err));
+      .catch(err => console.error('獲取走失寵物失敗:', err));
+
     axios
       .get('http://localhost:3001/api/found-pets')
       .then(res => setFoundPets(res.data))
-      .catch(err => console.error(err));
-  }, [token]);
+      .catch(err => console.error('獲取報料記錄失敗:', err));
+  }, [token, location.pathname]);
 
   const handleLogin = (newToken, newUser) => {
     setToken(newToken);
@@ -65,13 +74,12 @@ function AppContent() {
     setEditForm({ name: newUser.name, phoneNumber: newUser.phoneNumber || '', email: newUser.email || '' });
     localStorage.setItem('token', newToken);
   
-    // 檢查是否有目標路徑需要跳轉
     const redirectPath = localStorage.getItem('redirectAfterLogin');
     if (redirectPath) {
-      localStorage.removeItem('redirectAfterLogin'); // 清除臨時存儲
+      localStorage.removeItem('redirectAfterLogin');
       navigate(redirectPath);
     } else {
-      navigate('/'); // 默認跳轉到首頁
+      navigate('/');
     }
   };
 
@@ -79,21 +87,24 @@ function AppContent() {
     setIsLoginOpen(false);
   };
 
-  // 自訂點擊處理函數，檢查登入狀態
   const handleProtectedLinkClick = (e, path) => {
-    e.preventDefault(); // 阻止默認跳轉
-    if (!user) {
-      setIsLoginOpen(true); // 未登入，顯示 LoginModal
+    e.preventDefault();
+    if (!user || !token) {
+      setIsLoginOpen(true);
+      localStorage.setItem('redirectAfterLogin', path);
     } else {
-      navigate(path); // 已登入，直接跳轉
+      navigate(path);
     }
   };
   
   const handleLogout = () => {
     setToken('');
     setUser(null);
+    setLostPets([]);
+    setFoundPets([]);
     localStorage.removeItem('token');
     setEditMode(false);
+    navigate('/');
   };
 
   const getBreedLabel = (petType, breed) => {
@@ -155,10 +166,10 @@ function AppContent() {
 
   return (
     <div>
-      <head>
+      <Helmet>
         <title>同搜毛棄 Pet Search United - 協助您尋回走失寵物</title>
         <meta name="description" content="同搜毛棄 Pet Search United 協助您尋回走失寵物，已幫助超過 1,000 個家庭團聚。立即報失或提供線索，尋回您的寵物！" />
-      </head>
+      </Helmet>
 
       <nav className="navbar custom-navbar">
         <div className="navbar-brand">
@@ -177,7 +188,7 @@ function AppContent() {
             <div className="user-profile">
               <img src="/user-avatar.png" alt="用戶頭像" className="user-avatar" />
               <span className="user-name">歡迎，{user.name}</span>
-              <Link to="/account" className="navbar-item" onClick={() => !user && setIsLoginOpen(true)}>
+              <Link to="/account" className="navbar-item">
                 帳戶
               </Link>
               <button className="button custom-logout-button" onClick={handleLogout}>
@@ -203,7 +214,7 @@ function AppContent() {
             <Route
               path="/report-lost"
               element={
-                <ProtectedRoute requireLogin={true} setIsLoginOpen={(value) => !isNavigating && setIsLoginOpen(value)}>
+                <ProtectedRoute requireLogin={true} setIsLoginOpen={setIsLoginOpen}>
                   <ReportLost user={user} token={token} />
                 </ProtectedRoute>
               }
@@ -214,100 +225,222 @@ function AppContent() {
             <Route path="/found-pet-list" element={<FoundPetList />} />
             <Route path="/admin" element={<ProtectedRoute requireAdmin={true} setIsLoginOpen={setIsLoginOpen}><AdminDashboard /></ProtectedRoute>} />
             <Route path="/admin/pending-groups" element={<AdminPendingGroups />} />
-            <Route path="/account" element={
-              user ? (
-                <div className="form-card">
-                  <h2 className="subtitle is-4 mb-4">
-                    <FaUser className="mr-2" /> 個人資料
-                  </h2>
-                  {editMode ? (
-                    <form onSubmit={handleUpdateProfile}>
-                      <div className="field">
-                        <label className="label">姓名 <span className="has-text-danger">*</span></label>
-                        <div className="control">
-                          <input
-                            className={`input ${errors.name ? 'is-danger' : ''}`}
-                            type="text"
-                            name="name"
-                            value={editForm.name}
-                            onChange={handleEditChange}
-                            required
-                          />
-                        </div>
-                        {errors.name && <p className="help is-danger">{errors.name}</p>}
-                      </div>
-                      <div className="field">
-                        <label className="label">電話</label>
-                        <div className="control">
-                          <input
-                            className={`input ${errors.phoneNumber ? 'is-danger' : ''}`}
-                            type="tel"
-                            name="phoneNumber"
-                            value={editForm.phoneNumber}
-                            onChange={handleEditChange}
-                            placeholder="8位電話號碼"
-                          />
-                        </div>
-                        {errors.phoneNumber && <p className="help is-danger">{errors.phoneNumber}</p>}
-                      </div>
-                      <div className="field">
-                        <label className="label">電郵</label>
-                        <div className="control">
-                          <input
-                            className={`input ${errors.email ? 'is-danger' : ''}`}
-                            type="email"
-                            name="email"
-                            value={editForm.email}
-                            onChange={handleEditChange}
-                            placeholder="電郵地址"
-                          />
-                        </div>
-                        {errors.email && <p className="help is-danger">{errors.email}</p>}
-                      </div>
-                      <div className="buttons is-right mt-4">
-                        <button
-                          type="button"
-                          className="button is-light"
-                          onClick={() => setEditMode(false)}
-                        >
-                          <FaTimes className="mr-2" /> 取消
-                        </button>
-                        <button type="submit" className="button custom-button">
-                          <FaSave className="mr-2" /> 保存
-                        </button>
-                      </div>
-                    </form>
-                  ) : (
-                    <>
-                      <p><strong>姓名：</strong> {user.name}</p>
-                      <p><strong>電話：</strong> {user.phoneNumber || '未提供'}</p>
-                      <p><strong>電郵：</strong> {user.email || '未提供'}</p>
+            <Route
+              path="/account"
+              element={
+                user ? (
+                  <>
+                    <div className="form-card">
+                      <h2 className="subtitle is-4 mb-4">
+                        <FaUser className="mr-2" /> 個人資料
+                      </h2>
+                      {editMode ? (
+                        <form onSubmit={handleUpdateProfile}>
+                          <div className="field">
+                            <label className="label">
+                              姓名 <span className="has-text-danger">*</span>
+                            </label>
+                            <div className="control">
+                              <input
+                                className={`input ${errors.name ? 'is-danger' : ''}`}
+                                type="text"
+                                name="name"
+                                value={editForm.name}
+                                onChange={handleEditChange}
+                                required
+                              />
+                            </div>
+                            {errors.name && <p className="help is-danger">{errors.name}</p>}
+                          </div>
+                          <div className="field">
+                            <label className="label">電話</label>
+                            <div className="control">
+                              <input
+                                className={`input ${errors.phoneNumber ? 'is-danger' : ''}`}
+                                type="tel"
+                                name="phoneNumber"
+                                value={editForm.phoneNumber}
+                                onChange={handleEditChange}
+                                placeholder="8位電話號碼"
+                              />
+                            </div>
+                            {errors.phoneNumber && (
+                              <p className="help is-danger">{errors.phoneNumber}</p>
+                            )}
+                          </div>
+                          <div className="field">
+                            <label className="label">電郵</label>
+                            <div className="control">
+                              <input
+                                className={`input ${errors.email ? 'is-danger' : ''}`}
+                                type="email"
+                                name="email"
+                                value={editForm.email}
+                                onChange={handleEditChange}
+                                placeholder="電郵地址"
+                              />
+                            </div>
+                            {errors.email && <p className="help is-danger">{errors.email}</p>}
+                          </div>
+                          <div className="buttons is-right mt-4">
+                            <button
+                              type="button"
+                              className="button is-light"
+                              onClick={() => setEditMode(false)}
+                            >
+                              <FaTimes className="mr-2" /> 取消
+                            </button>
+                            <button type="submit" className="button custom-button">
+                              <FaSave className="mr-2" /> 保存
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <>
+                          <p>
+                            <strong>姓名：</strong> {user.name}
+                          </p>
+                          <p>
+                            <strong>電話：</strong> {user.phoneNumber || '未提供'}
+                          </p>
+                          <p>
+                            <strong>電郵：</strong> {user.email || '未提供'}
+                          </p>
+                          <div className="buttons mt-4">
+                            {user.role === 'admin' && (
+                              <Link to="/admin" className="button is-info mr-4">
+                                管理員面板
+                              </Link>
+                            )}
+                            <button
+                              className="button custom-button"
+                              onClick={() => setEditMode(true)}
+                            >
+                              <FaEdit className="mr-2" /> 編輯資料
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
 
-                      {/* 只有 Admin 角色才顯示管理員面板按鈕 */}
-                      {user.role === 'admin' && (
-                        <Link to="/admin" className="button is-info mr-4 mt-4">
-                          管理員面板
-                        </Link>
-                      )}
-        
-                      <button
-                        className="button custom-button mt-4"
-                        onClick={() => setEditMode(true)}
-                      >
-                        <FaEdit className="mr-2" /> 編輯資料
-                      </button>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <div className="form-card has-text-centered">
-                  <p className="is-size-5">請先登入</p>
-                  <button className="button custom-login-button mt-3" onClick={() => setIsLoginOpen(true)}>
-                    立即登入
-                  </button>
-                </div>
-              )
-            } />
+                    {!editMode && (
+                      <div className="mt-6">
+                        <div className="buttons">
+                          <Link
+                            to="/account/lost-reports"
+                            className="button is-primary mr-4"
+                            style={{
+                              width: '140px',
+                              height: '140px',
+                              padding: '10px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              textAlign: 'center',
+                              gap: '8px',
+                            }}
+                          >
+                            <FaPaw size={50} />
+                            <span style={{ fontSize: '14px', lineHeight: '1.2' }}>
+                              報失記錄
+                            </span>
+                          </Link>
+                          <Link
+                            to="/account/found-reports"
+                            className="button is-primary mr-4"
+                            style={{
+                              width: '140px',
+                              height: '140px',
+                              padding: '10px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              textAlign: 'center',
+                              gap: '8px',
+                            }}
+                          >
+                            <FaSearch size={50} />
+                            <span style={{ fontSize: '14px', lineHeight: '1.2' }}>
+                              報料記錄
+                            </span>
+                          </Link>
+                          <Link
+                            to="/report-lost"
+                            className="button is-primary mr-4"
+                            style={{
+                              width: '140px',
+                              height: '140px',
+                              padding: '10px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              textAlign: 'center',
+                              gap: '8px',
+                            }}
+                            onClick={(e) => handleProtectedLinkClick(e, '/report-lost')}
+                          >
+                            <FaPaw size={50} />
+                            <span style={{ fontSize: '14px', lineHeight: '1.2' }}>
+                              報失寵物
+                            </span>
+                          </Link>
+                          <Link
+                            to="/report-found"
+                            className="button is-primary"
+                            style={{
+                              width: '140px',
+                              height: '140px',
+                              padding: '10px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              textAlign: 'center',
+                              gap: '8px',
+                            }}
+                            onClick={(e) => handleProtectedLinkClick(e, '/report-found')}
+                          >
+                            <FaSearch size={50} />
+                            <span style={{ fontSize: '14px', lineHeight: '1.2' }}>
+                              提供線索
+                            </span>
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="form-card has-text-centered">
+                    <p className="is-size-5">請先登入</p>
+                    <button
+                      className="button custom-login-button mt-3"
+                      onClick={() => setIsLoginOpen(true)}
+                    >
+                      立即登入
+                    </button>
+                  </div>
+                )
+              }
+            />
+            <Route
+              path="/account/lost-reports"
+              element={
+                <ProtectedRoute requireLogin={true} setIsLoginOpen={setIsLoginOpen}>
+                  <UserLostReports user={user} token={token} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/account/found-reports"
+              element={
+                <ProtectedRoute requireLogin={true} setIsLoginOpen={setIsLoginOpen}>
+                  <UserFoundReports user={user} token={token} />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/" element={
               <div>
                 <div className="hero-section has-text-centered mb-6">
@@ -381,17 +514,22 @@ function AppContent() {
                         attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                       />
                       {lostPets.map(pet => {
-                        if (pet.location) {
-                          const [lat, lng] = pet.location.split(',').map(coord => parseFloat(coord));
+                        if (pet.location && typeof pet.location === 'string') {
+                          const [lat, lng] = pet.location.split(',').map(coord => parseFloat(coord.trim()));
                           if (!isNaN(lat) && !isNaN(lng)) {
                             return (
                               <reactLeaflet.Marker key={pet.lostId} position={[lat, lng]}>
                                 <reactLeaflet.Popup>
-                                  <img
-                                    src={`http://localhost:3001/${pet.frontPhoto.split(',')[0].split('/').pop()}`}
-                                    alt={`${pet.name} 的照片`}
-                                    className="pet-image"
-                                  />
+                                  {pet.frontPhoto ? (
+                                    <img
+                                      src={`http://localhost:3001/${pet.frontPhoto.split(',')[0].split('/').pop()}`}
+                                      alt={`走失寵物 ${pet.name} 的照片`}
+                                      className="pet-image"
+                                      onError={(e) => (e.target.src = '/icon/cat.png')}
+                                    />
+                                  ) : (
+                                    <img src="/icon/cat.png" alt="寵物占位圖" className="pet-image" />
+                                  )}
                                   <b>{pet.name}</b><br />
                                   <Link to={`/pet/${pet.lostId}`}>查看詳情</Link>
                                 </reactLeaflet.Popup>
@@ -436,7 +574,10 @@ function AppContent() {
                             </div>
                           </div>
                           <div className="control">
-                            <button className="button custom-button" aria-label="過濾寵物">
+                            <button
+                              className="button custom-button"
+                              aria-label="過濾寵物"
+                            >
                               <FaFilter className="mr-2" /> 過濾
                             </button>
                           </div>
@@ -454,8 +595,9 @@ function AppContent() {
                                   <figure className="image is-4by3">
                                     <img
                                       src={`http://localhost:3001/${pet.frontPhoto.split(',')[0].split('/').pop()}`}
-                                      alt={`${pet.name} 的照片`}
+                                      alt={`走失寵物 ${pet.name} 的照片`}
                                       className="pet-image"
+                                      onError={(e) => (e.target.src = '/icon/cat.png')}
                                     />
                                   </figure>
                                 ) : (
@@ -495,63 +637,65 @@ function AppContent() {
                     </div>
                   </div>
                   <div className="column is-one-third">
-                  <div className="form-card">
-                    <h2 className="subtitle is-4 mb-4 has-text-centered">
-                      <FaPaw className="mr-2" /> 最新報料動態
-                    </h2>
-                    {foundPets.length > 0 ? (
-                      foundPets.slice(0, 3).map(pet => (
-                        <div key={pet.foundId} className="notification is-light mb-3">
-                          <div className="media">
-                            <div className="media-left">
-                              {pet.photos && pet.photos.split(',')[0] ? (
-                                <figure className="image is-48x48">
-                                  <img
-                                    src={`http://localhost:3001/${pet.photos.split(',')[0].split('/').pop()}`}
-                                    alt={`${pet.petType} 的照片`}
-                                    className="is-rounded"
-                                    onError={(e) => (e.target.src = '/icon/cat.png')} // 圖片加載失敗時顯示默認圖標
-                                  />
-                                </figure>
-                              ) : (
-                                <figure className="image is-48x48">
-                                  <img
-                                    src="/icon/cat.png"
-                                    alt="寵物占位圖"
-                                    className="is-rounded"
-                                  />
-                                </figure>
-                              )}
-                            </div>
-                            <div className="media-content">
-                              <p className="is-size-6">
-                                發現 <strong>{pet.petType === 'cat' ? '貓' : '狗'} - {getBreedLabel(pet.petType, pet.breed)}</strong> 在 {pet.displayLocation || '未知地點'}
-                              </p>
-                              <p className="is-size-7 has-text-grey">
-                                發現時間：{pet.found_date?.split(' ')[0]}
-                              </p>
-                              {pet.isPublic == 1 && pet.reportername && pet.phoneNumber && (
-                                <p className="is-size-7 has-text-grey">
-                                  報料人：{pet.reportername} | 電話：{pet.phoneNumber}
+                    <div className="form-card">
+                      <h2 className="subtitle is-4 mb-4 has-text-centered">
+                        <FaPaw className="mr-2" /> 最新報料動態
+                      </h2>
+                      {foundPets.length > 0 ? (
+                        foundPets.slice(0, 3).map(pet => (
+                          <div key={pet.foundId} className="notification is-light mb-3">
+                            <div className="media">
+                              <div className="media-left">
+                                {pet.photos && pet.photos.split(',')[0] ? (
+                                  <figure className="image is-48x48">
+                                    <img
+                                      src={`http://localhost:3001/${pet.photos.split(',')[0].split('/').pop()}`}
+                                      alt={`發現的${pet.petType === 'cat' ? '貓' : '狗'}照片`}
+                                      className="is-rounded"
+                                      onError={(e) => (e.target.src = '/icon/cat.png')}
+                                    />
+                                  </figure>
+                                ) : (
+                                  <figure className="image is-48x48">
+                                    <img
+                                      src="/icon/cat.png"
+                                      alt="寵物占位圖"
+                                      className="is-rounded"
+                                    />
+                                  </figure>
+                                )}
+                              </div>
+                              <div className="media-content">
+                                <p className="is-size-6">
+                                  發現 <strong>{pet.petType === 'cat' ? '貓' : '狗'} - {getBreedLabel(pet.petType, pet.breed)}</strong> 在 {pet.displayLocation || '未知地點'}
                                 </p>
-                              )}
-                              <Link to={`/pet/${pet.foundId}`} className="button custom-button is-small mt-2">
-                                查看詳情
-                              </Link>
+                                <p className="is-size-7 has-text-grey">
+                                  發現時間：{pet.found_date?.split(' ')[0]}
+                                </p>
+                                {pet.isPublic == 1 && pet.reportername && pet.phoneNumber && (
+                                  <p className="is-size-7 has-text-grey">
+                                    報料人：{pet.reportername} | 電話：{pet.phoneNumber}
+                                  </p>
+                                )}
+                                <Link to={`/pet/${pet.foundId}`} className="button custom-button is-small mt-2">
+                                  查看詳情
+                                </Link>
+                              </div>
                             </div>
                           </div>
+                        ))
+                      ) : (
+                        <p className="has-text-grey has-text-centered">暫無報料記錄</p>
+                      )}
+                      {foundPets.length > 3 && (
+                        <div className="has-text-centered">
+                          <Link to="/found-pet-list" className="button custom-button is-small mt-3">
+                            查看更多 <FaArrowRight className="ml-2" />
+                          </Link>
                         </div>
-                      ))
-                    ) : (
-                      <p className="has-text-grey has-text-centered">暫無報料記錄</p>
-                    )}
-                    {foundPets.length > 3 && (
-                      <Link to="/found-pet-list" className="button custom-button is-small mt-3">
-                        查看更多 <FaArrowRight className="ml-2" />
-                      </Link>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
                 </div>
                 <div className="form-card mb-6">
                   <h2 className="subtitle is-4 mb-4 has-text-centered">
@@ -630,19 +774,19 @@ function AppContent() {
                   </h2>
                   <div className="columns is-multiline is-centered">
                     <div className="column is-3 has-text-centered">
-                      <img src="/partner-1.png" alt="香港寵物協會" className="partner-logo" />
+                      <img src="/partner-1.png" alt="香港寵物協會標誌" className="partner-logo" />
                       <p className="partner-name">香港寵物協會</p>
                     </div>
                     <div className="column is-3 has-text-centered">
-                      <img src="/partner-2.png" alt="動物保護組織" className="partner-logo" />
+                      <img src="/partner-2.png" alt="動物保護組織標誌" className="partner-logo" />
                       <p className="partner-name">動物保護組織</p>
                     </div>
                     <div className="column is-3 has-text-centered">
-                      <img src="/partner-3.png" alt="香港獸醫協會" className="partner-logo" />
+                      <img src="/partner-3.png" alt="香港獸醫協會標誌" className="partner-logo" />
                       <p className="partner-name">香港獸醫協會</p>
                     </div>
                     <div className="column is-3 has-text-centered">
-                      <img src="/partner-4.png" alt="寵物救援隊" className="partner-logo" />
+                      <img src="/partner-4.png" alt="寵物救援隊標誌" className="partner-logo" />
                       <p className="partner-name">寵物救援隊</p>
                     </div>
                   </div>

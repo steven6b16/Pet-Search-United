@@ -52,7 +52,7 @@ function PetDetail() {
     const token = localStorage.getItem('token');
     if (token) {
       axios
-        .get('http://localhost:3001/api/me', { headers: { Authorization: `Bearer ${token}` } })
+        .get('http://localhost:3001/api/check-is-user', { headers: { Authorization: `Bearer ${token}` } })
         .then((res) => setUser(res.data))
         .catch((err) => {
           console.error('Get user failed:', err);

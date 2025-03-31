@@ -518,3 +518,7 @@
 .custom-react-select__single-value {
   color: #333 !important;
 }
+
+.control .select select {
+  padding: 12px 35px 12px 12px !important;
+}
