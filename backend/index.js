@@ -87,6 +87,7 @@ db.serialize(() => {
       displayLocation TEXT,
       region TEXT,
       createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      modifiedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       isPublic BOOLEAN DEFAULT 0,
       isFound BOOLEAN DEFAULT 0,
       isDeleted BOOLEAN DEFAULT 0,
@@ -131,7 +132,7 @@ db.serialize(() => {
 
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
-      userId INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId TEXT PRIMARY KEY, 
       name TEXT,
       phoneNumber TEXT UNIQUE,
       email TEXT UNIQUE,
@@ -181,12 +182,10 @@ db.serialize(() => {
       createdBy INTEGER,
       FOREIGN KEY (lostId) REFERENCES lost_pets(lostId),
       FOREIGN KEY (foundId) REFERENCES found_pets(foundId),
-      FOREIGN KEY (confirmedBy) REFERENCES users(userId),
-      UNIQUE(lostId, foundId)
+      FOREIGN KEY (confirmedBy) REFERENCES users(userId)
     )
   `);
 
-  // 檢查並添加 casestatus 欄位（如果表已存在）
   db.all("PRAGMA table_info(found_pets)", (err, rows) => {
     if (err) console.error('檢查 found_pets 表結構失敗:', err);
     else {
@@ -286,17 +285,27 @@ app.post('/api/register', async (req, res) => {
     const verificationToken = generateToken();
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
+    // 計算當前用戶數量並生成新的 userId
+    const count = await new Promise((resolve, reject) => {
+      db.get('SELECT COUNT(*) as count FROM users', (err, row) => {
+        if (err) reject(err);
+        else resolve(row.count);
+      });
+    });
+    const userId = `UID${(count + 1).toString().padStart(3, '0')}`; // 生成 UID001, UID002 等
+
+    // 插入新用戶
     const stmt = db.prepare(`
-      INSERT INTO users (phoneNumber, email, password, verificationToken, verificationExpires)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO users (userId, phoneNumber, email, password, verificationToken, verificationExpires)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
-    stmt.run(phoneNumber || null, email || null, hashedPassword, verificationToken, verificationExpires, (err) => {
+    stmt.run(userId, phoneNumber || null, email || null, hashedPassword, verificationToken, verificationExpires, (err) => {
       if (err) {
         console.error('註冊失敗:', err);
         return res.status(500).json({ error: '註冊失敗，可能電話或電郵已存在' });
       }
       console.log(`驗證鏈接: http://localhost:3001/api/verify?token=${verificationToken}`);
-      res.status(201).json({ message: '註冊成功，請檢查電郵進行驗證' });
+      res.status(201).json({ message: '註冊成功，請檢查電郵進行驗證', userId }); // 返回生成的 userId
     });
     stmt.finalize();
   } catch (err) {
@@ -321,7 +330,7 @@ app.get('/api/verify', (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
-  const { identifier, password } = req.body;
+  const { identifier, password, phonePrefix } = req.body;
   if (!identifier || !password) {
     return res.status(400).json({ error: '請輸入電話/電郵同密碼' });
   }
@@ -343,22 +352,20 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: '密碼錯誤' });
     }
 
-    // 修改這部分，加入 role
     const token = jwt.sign(
-      { userId: user.userId, role: user.role }, // 添加 role
+      { userId: user.userId, role: user.role },  // userId 已是 UIDXXX 格式
       JWT_SECRET,
       { expiresIn: '1h' }
     );
     db.run('UPDATE users SET lastLoginAt = CURRENT_TIMESTAMP, failedLoginAttempts = 0 WHERE userId = ?', [user.userId]);
-    // 順便把 role 加到回應中，方便前端使用
     res.json({ 
       token, 
       user: { 
-        userId: user.userId, 
+        userId: user.userId,  // 返回 UIDXXX
         name: user.name, 
         phoneNumber: user.phoneNumber, 
         email: user.email, 
-        role: user.role // 添加 role
+        role: user.role 
       } 
     });
   });
@@ -373,12 +380,128 @@ app.get('/api/check-is-user', authenticateToken, (req, res) => {
   });
 });
 
-// 新增 PUT /api/me 路由：更新用戶資料
+app.get('/api/user/lost-reports', authenticateToken, (req, res) => {
+  try {
+    db.all(
+      'SELECT * FROM lost_pets WHERE userId = ? AND isDeleted = 0',
+      [req.user.userId],
+      (err, rows) => {
+        if (err) {
+          console.error('數據庫錯誤:', err);
+          return res.status(500).json({ error: '數據庫錯誤' });
+        }
+        res.json(rows);
+      }
+    );
+  } catch (err) {
+    res.status(401).json({ error: '沒有有效記錄' });
+  }
+});
+
+app.get('/api/user/found-reports', authenticateToken, (req, res) => {
+
+  try {
+    db.all(
+      'SELECT * FROM found_pets WHERE userId = ? AND isDeleted = 0',
+      [req.user.userId],
+      (err, rows) => {
+        if (err) {
+          console.error('數據庫錯誤:', err);
+          return res.status(500).json({ error: '數據庫錯誤' });
+        }
+        res.json(rows);
+      }
+    );
+  } catch (err) {
+    res.status(401).json({ error: '沒有有效記錄' });
+  }
+});
+
+// 刪除用戶的報失記錄
+app.delete('/api/user/lost-reports/:lostId', authenticateToken, async (req, res) => {
+  const { lostId } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    // 檢查記錄是否存在並屬於該用戶
+    const report = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM lost_pets WHERE lostId = ? AND userId = ? AND isDeleted = 0', 
+        [lostId, userId], 
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
+
+    if (!report) {
+      return res.status(404).json({ error: '報失記錄不存在或無權操作' });
+    }
+
+
+    // 標記為已刪除（軟刪除）
+    await new Promise((resolve, reject) => {
+      db.run(
+        'UPDATE lost_pets SET isDeleted = 1, modifiedAt = CURRENT_TIMESTAMP WHERE lostId = ? AND userId = ?',
+        [lostId, userId],
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    });
+
+    res.json({ message: '報失記錄已成功刪除' });
+  } catch (err) {
+    console.error('刪除報失記錄失敗:', err);
+    res.status(500).json({ error: '刪除報失記錄失敗' });
+  }
+});
+
+// 刪除用戶的報料記錄
+app.delete('/api/user/found-reports/:foundId', authenticateToken, async (req, res) => {
+  const { foundId } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    // 檢查記錄是否存在並屬於該用戶
+    const report = await new Promise((resolve, reject) => {
+      db.get('SELECT * FROM found_pets WHERE foundId = ? AND userId = ? AND isDeleted = 0', 
+        [foundId, userId], 
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
+
+    if (!report) {
+      return res.status(404).json({ error: '報料記錄不存在或無權操作' });
+    }
+
+    // 標記為已刪除（軟刪除）
+    await new Promise((resolve, reject) => {
+      db.run(
+        'UPDATE found_pets SET isDeleted = 1, modifiedAt = CURRENT_TIMESTAMP WHERE foundId = ? AND userId = ?',
+        [foundId, userId],
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    });
+
+    res.json({ message: '報料記錄已成功刪除' });
+  } catch (err) {
+    console.error('刪除報料記錄失敗:', err);
+    res.status(500).json({ error: '刪除報料記錄失敗' });
+  }
+});
+
 app.put('/api/update-user-info', authenticateToken, async (req, res) => {
   const { name, phoneNumber, email } = req.body;
   const userId = req.user.userId;
 
-  // 驗證輸入
   if (!name) {
     return res.status(400).json({ error: '姓名係必填項' });
   }
@@ -390,7 +513,6 @@ app.put('/api/update-user-info', authenticateToken, async (req, res) => {
   }
 
   try {
-    // 檢查電話或電郵是否已被其他用戶使用
     const existingUser = await new Promise((resolve, reject) => {
       db.get(
         'SELECT userId FROM users WHERE (phoneNumber = ? OR email = ?) AND userId != ? AND isDeleted = FALSE',
@@ -406,7 +528,6 @@ app.put('/api/update-user-info', authenticateToken, async (req, res) => {
       return res.status(409).json({ error: '電話號碼或電郵已被其他用戶使用' });
     }
 
-    // 更新用戶資料
     const stmt = db.prepare(`
       UPDATE users 
       SET name = ?, phoneNumber = ?, email = ?, modifiedAt = CURRENT_TIMESTAMP 
@@ -417,7 +538,6 @@ app.put('/api/update-user-info', authenticateToken, async (req, res) => {
         console.error('更新用戶資料失敗:', err);
         return res.status(500).json({ error: '更新資料失敗' });
       }
-      // 返回更新後嘅資料
       db.get('SELECT userId, name, phoneNumber, email FROM users WHERE userId = ?', [userId], (err, updatedUser) => {
         if (err) {
           return res.status(500).json({ error: '獲取更新後資料失敗' });
@@ -477,22 +597,28 @@ app.post('/api/reset-password', async (req, res) => {
 });
 
 app.post('/api/report-lost', uploadFields, async (req, res) => {
+  // 打印接收到的請求數據，用於調試
   console.log('接收到的 req.body:', req.body);
   console.log('接收到的 req.files:', req.files);
+
   try {
+    // 從請求中提取 lost_pet 的相關字段
     const {
       userId, ownername, phonePrefix, phoneNumber, email, name, breed, petType,
       gender, age, color, lost_date, location, details, chipNumber, fullAddress,
       displayLocation, region = 'HK', isPublic, isFound, isDeleted
     } = req.body;
 
-    const frontPhoto = req.files['frontPhoto'] ? req.files['frontPhoto'][0].path : null;
-    const sidePhoto = req.files['sidePhoto'] ? req.files['sidePhoto'][0].path : null;
-    const otherPhotos = req.files['otherPhotos'] ? req.files['otherPhotos'].map(file => file.path).join(',') : null;
+    // 處理上傳的圖片文件，若無則設為 null
+    const frontPhoto = req.files['frontPhoto'] ? req.files['frontPhoto'][0].path : null; // 正面照片路徑
+    const sidePhoto = req.files['sidePhoto'] ? req.files['sidePhoto'][0].path : null;   // 側面照片路徑
+    const otherPhotos = req.files['otherPhotos'] ? req.files['otherPhotos'].map(file => file.path).join(',') : null; // 其他照片路徑（多張以逗號分隔）
 
+    // 生成唯一的 lostId，基於地區和類型
     const lostId = await generateId('lost', region);
     console.log(`生成 ${lostId} ID`);
 
+    // 準備插入 lost_pets 表的 SQL 語句
     const stmt = db.prepare(`
       INSERT INTO lost_pets (
         lostId, userId, ownername, phonePrefix, phoneNumber, email, name, breed, petType,
@@ -500,6 +626,8 @@ app.post('/api/report-lost', uploadFields, async (req, res) => {
         otherPhotos, fullAddress, displayLocation, region, isPublic, isFound, isDeleted
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
+
+    // 執行插入操作，將數據存入 lost_pets 表
     stmt.run(
       lostId, userId, ownername, phonePrefix, phoneNumber, email, name, breed, petType,
       gender, age, color, lost_date, location, details, chipNumber, frontPhoto, sidePhoto,
@@ -509,43 +637,87 @@ app.post('/api/report-lost', uploadFields, async (req, res) => {
           console.error('插入數據失敗:', err);
           return res.status(500).send('插入數據失敗');
         }
-        res.send({ lostId });
       }
     );
-    stmt.finalize();
+    stmt.finalize(); // 完成 SQL 語句執行
+
+    // 開始匹配流程，調用 Flask 的 /match-found-lost 端點
+    console.log('開始調用 /match-found-lost API 進行匹配');
+
+    try {
+      // 構造匹配數據，使用 lost_pet 的原始字段名稱
+      const matchData = {
+        lostId,        // 遺失寵物的唯一 ID
+        petType,       // 寵物類型（例如 cat, dog）
+        breed,         // 品種
+        color,         // 顏色
+        lost_date,     // 遺失日期
+        location,      // 遺失地點（經緯度格式）
+        details        // 詳細描述
+      };
+
+      // 發送 POST 請求到 Flask 的 /match-found-lost 端點
+      const response = await axios.post('http://localhost:5001/match-found-lost', matchData, {
+        headers: { 'Content-Type': 'application/json' }, // 設置請求頭為 JSON 格式
+      });
+      const matchedFoundIds = response.data; // 獲取匹配到的 foundId 列表
+      console.log('匹配到的尋獲寵物 ID:', matchedFoundIds);
+
+      // 如果有匹配結果，將其存入 pet_matches 表
+      if (matchedFoundIds.length > 0) {
+        const stmtMatches = db.prepare(`
+          INSERT INTO pet_matches (lostId, foundId, status)
+          VALUES (?, ?, ?)
+        `);
+        matchedFoundIds.forEach(foundId => {
+          stmtMatches.run(lostId, foundId, 'pending'); // 插入每一對匹配，狀態設為 pending
+        });
+        stmtMatches.finalize(); // 完成匹配記錄的插入
+      }
+
+      // 返回成功響應，包括 lostId 和匹配結果
+      res.send({ lostId, matchedFoundIds });
+    } catch (matchErr) {
+      // 如果匹配失敗，打印錯誤並返回空匹配列表，但不影響報失流程
+      console.error('匹配失敗:', matchErr);
+      res.send({ lostId, matchedFoundIds: [] });
+    }
   } catch (err) {
+    // 處理報失流程中的其他錯誤
     console.error('報失 API 錯誤:', err);
     res.status(500).send('服務器錯誤');
   }
 });
 
-// 處理報料寵物嘅 API 端點，允許上傳最多 5 張圖片
+// 報料 API：處理尋獲寵物的提交和匹配
 app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
+  // 打印開始訊息，用於調試
+  console.log('開始處理 report-found');
+
   try {
-    // 從請求中提取報料數據
-    const { userId, reportername, phonePrefix, phoneNumber, email, breed, petType, gender,
+    // 從請求中提取 found_pet 的相關字段
+    const {
+      userId, reportername, phonePrefix, phoneNumber, email, breed, petType, gender,
       age, color, found_date, found_location, found_details, region, chipNumber, fullAddress,
-      displayLocation, holding_location, status, isPublic, isFound, isDeleted } = req.body;
-    
-    // 將上傳嘅圖片路徑合併為逗號分隔嘅字符串
+      displayLocation, holding_location, status, isPublic, isFound, isDeleted
+    } = req.body;
+
+    // 處理上傳的照片，將多張照片路徑用逗號分隔
     const photos = req.files.map(file => file.path).join(',');
-    
-    // 生成唯一嘅 foundId（例如 HK-found20250301）
-    const foundId = await generateId('found', region);
 
-    // 生成 6 位數嘅訪問 PIN 碼，用於非註冊用戶更新報料
-    const accessPin = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // 設置 PIN 碼過期時間（30 天後）
-    const pinExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    // 生成唯一的 foundId 和訪問 PIN
+    const foundId = await generateId('found', region); // 基於地區生成 foundId
+    const accessPin = Math.floor(100000 + Math.random() * 900000).toString(); // 隨機生成 6 位 PIN
+    const pinExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // PIN 有效期 30 天
 
-    // 插入新報料記錄到 found_pets 表
+    // 將 found_pet 數據插入 found_pets 表
     await new Promise((resolve, reject) => {
       const stmt = db.prepare(`
-        INSERT INTO found_pets (foundId, userId, reportername, phonePrefix, phoneNumber, email, breed, petType, gender,
-        age, color, found_date, found_location, found_details, region, chipNumber, photos, fullAddress,
-        displayLocation, holding_location, status, casestatus, isPublic, isFound, isDeleted, accessPin, pinExpires)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO found_pets (
+          foundId, userId, reportername, phonePrefix, phoneNumber, email, breed, petType, gender,
+          age, color, found_date, found_location, found_details, region, chipNumber, photos, fullAddress,
+          displayLocation, holding_location, status, casestatus, isPublic, isFound, isDeleted, accessPin, pinExpires
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       stmt.run(
         foundId, userId || null, reportername, phonePrefix, phoneNumber || null, email || null, breed, petType, gender,
@@ -560,18 +732,54 @@ app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
           }
         }
       );
-      stmt.finalize();
+      stmt.finalize(); // 完成 SQL 語句執行
     });
 
-    // 準備 ML 分析所需嘅數據
+    // 開始匹配流程：調用 Flask 的 /match-lost-found 端點，匹配 found_pet 與 lost_pets
+    console.log('開始調用 /match-lost-found API 進行匹配');
+    const matchData = { foundId, petType, breed, color, found_date, found_location, found_details };
+    let matchedLostIds = [];
+    try {
+      // 發送 POST 請求到 Flask 的 /match-lost-found 端點
+      const response = await axios.post('http://localhost:5001/match-lost-found', matchData, {
+        headers: { 'Content-Type': 'application/json' }, // 設置請求頭為 JSON 格式
+      });
+      matchedLostIds = response.data; // 獲取匹配到的 lostId 列表
+      console.log('匹配到的遺失寵物 ID:', matchedLostIds);
+
+      // 如果有匹配結果，將其存入 pet_matches 表
+      if (matchedLostIds.length > 0) {
+        const stmtMatches = db.prepare(`
+          INSERT INTO pet_matches (lostId, foundId, status)
+          VALUES (?, ?, ?)
+        `);
+        matchedLostIds.forEach(lostId => {
+          stmtMatches.run(lostId, foundId, 'pending'); // 插入每一對匹配，狀態設為 pending
+        });
+        stmtMatches.finalize(); // 完成匹配記錄的插入
+      }
+    } catch (matchErr) {
+      // 如果匹配失敗，打印錯誤但繼續執行後續流程
+      console.error('匹配 /match-lost-found 失敗:', matchErr);
+    }
+
+    // 開始分析流程：調用 Flask 的 /match-found-found 端點，檢查相似 found_pets
+    console.log('開始調用 /match-found-found API 進行相似性分析');
     const newPetData = { foundId, petType, breed, color, found_date, found_location, found_details };
+    let similarFoundIds = [];
+    try {
+      // 發送 POST 請求到 Flask 的 /match-found-found 端點
+      const analyzeResponse = await axios.post('http://localhost:5001/match-found-found', newPetData, {
+        headers: { 'Content-Type': 'application/json' }, // 設置請求頭為 JSON 格式
+      });
+      similarFoundIds = analyzeResponse.data; // 獲取相似 foundId 列表
+      console.log('相似性分析結果:', similarFoundIds);
+    } catch (analyzeErr) {
+      // 如果分析失敗，打印錯誤但繼續執行後續流程
+      console.error('分析 /match-found-found 失敗:', analyzeErr);
+    }
 
-    // 調用 Python API 進行相似性分析，獲取相似嘅 foundId 列表
-    const response = await axios.post('http://localhost:5001/analyze', newPetData);
-    const similarFoundIds = response.data;
-    console.log('ML 分析結果:', similarFoundIds);
-
-    // 更新 found_pets 表中該記錄嘅 casestatus 為 'active'
+    // 更新 found_pets 表的 casestatus 為 active
     await new Promise((resolve, reject) => {
       db.run('UPDATE found_pets SET casestatus = ? WHERE foundId = ?', ['active', foundId], (err) => {
         if (err) {
@@ -583,16 +791,16 @@ app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
       });
     });
 
-    // 如果有相似個案（similarFoundIds 不為空），檢查或創建 Group
+    // 如果有相似 found_pets，處理分組邏輯
     if (similarFoundIds.length > 0) {
-      // 查詢 found_pet_groups 表，檢查是否有包含 similarFoundIds 嘅現有 Group
+      // 檢查是否已存在包含相似 foundId 的群組
       const existingGroup = await new Promise((resolve, reject) => {
         db.get(
           `SELECT groupId, pendingFoundIds 
            FROM found_pet_groups 
            WHERE isDeleted = 0 AND pendingFoundIds LIKE ? 
            ORDER BY createdAt DESC LIMIT 1`,
-          [`%${similarFoundIds[0]}%`], // 用第一個相似 ID 作為查詢條件
+          [`%${similarFoundIds[0]}%`],
           (err, row) => {
             if (err) reject(err);
             else resolve(row);
@@ -602,15 +810,14 @@ app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
 
       let groupId;
       if (existingGroup) {
-        // 如果已有 Group，重用該 groupId 並更新 pendingFoundIds
+        // 如果已有群組，更新其 pendingFoundIds
         groupId = existingGroup.groupId;
         let pendingFoundIds = existingGroup.pendingFoundIds ? existingGroup.pendingFoundIds.split(',') : [];
         if (!pendingFoundIds.includes(foundId)) {
-          pendingFoundIds.push(foundId); // 將新 foundId 添加到 pendingFoundIds
+          pendingFoundIds.push(foundId); // 添加新 foundId
         }
-        const updatedPendingFoundIds = [...new Set(pendingFoundIds)].join(','); // 去重後轉為逗號分隔字符串
+        const updatedPendingFoundIds = [...new Set(pendingFoundIds)].join(','); // 去重後轉為字串
 
-        // 更新 found_pet_groups 表嘅 pendingFoundIds
         await new Promise((resolve, reject) => {
           db.run(
             'UPDATE found_pet_groups SET pendingFoundIds = ? WHERE groupId = ?',
@@ -626,7 +833,7 @@ app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
           );
         });
       } else {
-        // 如果無現有 Group，創建新 Group
+        // 如果沒有群組，創建新群組
         groupId = `GROUP${Date.now()}`; // 生成唯一 groupId
         await new Promise((resolve, reject) => {
           const stmtGroup = db.prepare(`
@@ -645,7 +852,7 @@ app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
         });
       }
 
-      // 更新 found_pets 表中該記錄嘅 groupId
+      // 更新 found_pets 表的 groupId
       await new Promise((resolve, reject) => {
         db.run('UPDATE found_pets SET groupId = ? WHERE foundId = ?', [groupId, foundId], (err) => {
           if (err) {
@@ -658,22 +865,22 @@ app.post('/api/report-found', upload.array('photos', 5), async (req, res) => {
       });
     }
 
-    // 如果有提供 email，記錄發送 PIN 嘅日誌（模擬發送 email）
+    // 如果提供了 email，模擬發送通知（實際應調用郵件服務）
     if (email) {
       console.log(`發送 email 到 ${email}，PIN: ${accessPin}，報料 ID: ${foundId}`);
     }
 
-    // 返回成功回應，包含 foundId 同 accessPin
-    res.send({ foundId, accessPin });
+    // 返回成功響應，包括 foundId, accessPin 和匹配的 lostIds
+    res.send({ foundId, accessPin, matchedLostIds });
   } catch (err) {
-    // 捕獲所有錯誤，返回 500 錯誤回應
+    // 處理報料流程中的其他錯誤
     console.error('報料 API 錯誤:', err);
     res.status(500).json({ error: '服務器錯誤' });
   }
 });
 
 app.get('/api/lost-pets', (req, res) => {
-  db.all('SELECT * FROM lost_pets WHERE isDeleted = 0', [], (err, rows) => {
+  db.all('SELECT * FROM lost_pets WHERE isDeleted = 0 ', [], (err, rows) => {
     if (err) {
       console.error('獲取走失寵物失敗:', err);
       return res.status(500).send('獲取數據失敗');
@@ -690,16 +897,17 @@ app.get('/api/lost-pets', (req, res) => {
   });
 });
 
-// 修改後的 GET /api/found-pets，支持 groupId 過濾
 app.get('/api/found-pets', (req, res) => {
   const { groupId } = req.query;
-  let query = 'SELECT * FROM found_pets WHERE isDeleted = 0';
+  let query = 'SELECT * FROM found_pets WHERE isDeleted = 0'; // 基礎查詢，去掉 ORDER BY
   let params = [];
 
   if (groupId) {
     query += ' AND groupId = ?';
     params.push(groupId);
   }
+
+  query += ' ORDER BY createdAt DESC'; // 在所有條件後添加 ORDER BY
 
   db.all(query, params, (err, rows) => {
     if (err) {
@@ -1095,7 +1303,6 @@ app.get('/geocode', async (req, res) => {
   }
 });
 
-// Admin Dashboard 路由，只有 Admin 可訪問
 app.get('/api/admin/dashboard', isAdmin, (req, res) => {
   db.all('SELECT groupId, pendingFoundIds, createdAt FROM found_pet_groups WHERE status = "pending" AND isDeleted = 0', [], (err, rows) => {
     if (err) {
@@ -1111,7 +1318,6 @@ app.get('/api/admin/dashboard', isAdmin, (req, res) => {
   });
 });
 
-// Admin 專用路由：獲取所有待確認嘅 found_pet_groups 及其相關 found_pets 資料
 app.get('/api/admin/pending-groups', isAdmin, async (req, res) => {
   try {
     const pendingGroups = await new Promise((resolve, reject) => {
@@ -1129,8 +1335,6 @@ app.get('/api/admin/pending-groups', isAdmin, async (req, res) => {
 
     const detailedGroups = await Promise.all(pendingGroups.map(async (group) => {
       const foundIds = group.pendingFoundIds ? group.pendingFoundIds.split(',') : [];
-
-      // 查詢每個 foundId 對應嘅 found_pets 記錄，包含 photos 字段
       const foundPets = await new Promise((resolve, reject) => {
         db.all(
           `SELECT foundId, petType, breed, color, found_date, found_location, found_details, photos 
@@ -1147,7 +1351,7 @@ app.get('/api/admin/pending-groups', isAdmin, async (req, res) => {
       return {
         groupId: group.groupId,
         pendingFoundIds: foundIds,
-        foundPets: foundPets // 包含圖片路徑
+        foundPets: foundPets
       };
     }));
 
@@ -1158,17 +1362,14 @@ app.get('/api/admin/pending-groups', isAdmin, async (req, res) => {
   }
 });
 
-// Admin 專用路由：確認或拒絕 found_pet_groups
 app.post('/api/admin/confirm-group', isAdmin, async (req, res) => {
-  const { groupId, selectedFoundIds, action } = req.body; // action: 'approve' 或 'reject'
+  const { groupId, selectedFoundIds, action } = req.body;
 
-  // 驗證請求數據
   if (!groupId || !selectedFoundIds || !Array.isArray(selectedFoundIds) || !['approve', 'reject'].includes(action)) {
     return res.status(400).json({ error: '請提供 groupId, selectedFoundIds 同有效嘅 action（approve 或 reject）' });
   }
 
   try {
-    // 查詢該 Group 嘅當前狀態
     const group = await new Promise((resolve, reject) => {
       db.get(
         `SELECT pendingFoundIds 
@@ -1194,7 +1395,6 @@ app.post('/api/admin/confirm-group', isAdmin, async (req, res) => {
     }
 
     if (action === 'approve') {
-      // 確認選擇嘅 foundId，將佢地加入 Group
       await Promise.all(validSelectedIds.map(foundId => {
         return new Promise((resolve, reject) => {
           db.run(
@@ -1208,11 +1408,9 @@ app.post('/api/admin/confirm-group', isAdmin, async (req, res) => {
         });
       }));
 
-      // 移除已確認嘅 foundId 從 pendingFoundIds
       pendingFoundIds = pendingFoundIds.filter(id => !validSelectedIds.includes(id));
       const updatedPendingFoundIds = pendingFoundIds.join(',');
 
-      // 更新 Group 狀態為 confirmed
       await new Promise((resolve, reject) => {
         db.run(
           `UPDATE found_pet_groups 
@@ -1228,11 +1426,9 @@ app.post('/api/admin/confirm-group', isAdmin, async (req, res) => {
 
       res.json({ message: '群組已確認', groupId });
     } else {
-      // 拒絕選擇嘅 foundId，移除佢地同 Group 嘅關聯
       pendingFoundIds = pendingFoundIds.filter(id => !validSelectedIds.includes(id));
       const updatedPendingFoundIds = pendingFoundIds.join(',');
 
-      // 更新 Group 狀態為 rejected
       await new Promise((resolve, reject) => {
         db.run(
           `UPDATE found_pet_groups 
@@ -1253,7 +1449,6 @@ app.post('/api/admin/confirm-group', isAdmin, async (req, res) => {
     res.status(500).json({ error: '處理群組確認失敗' });
   }
 });
-
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);

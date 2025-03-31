@@ -48,7 +48,7 @@ const RegisterModal = ({ isOpen, onClose }) => {
       const res = await axios.post('http://localhost:3001/api/register', payload);
       setMessage(res.data.message);
       setError('');
-      onClose();
+      //onClose();
     } catch (err) {
       setError(err.response?.data?.error || '註冊失敗');
       setMessage('');

@@ -17,7 +17,7 @@ label{
 .container {
   padding: 0;
   margin: 0 auto;
-  max-width: 1200px;
+  /*max-width: 1200px;*/
 }
 
 /* 淡入動畫 */
@@ -441,11 +441,12 @@ label{
 .custom-select select {
   border: 1px solid #0057B7 !important;
   border-radius: 8px !important;
-  padding: 8px 40px 7px 7px !important;
+  padding: 12px 12px 12px 18px !important;
   font-size: 1rem !important;
   color: #333333 !important;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
+
 
 .custom-select select:focus {
   border-color: #00A3E0 !important;
@@ -496,6 +497,17 @@ label{
   background: #F5F5F5;
   border-radius: 10px;
   padding: 20px;
+  display: flex;
+  align-items: center; /* 確保圖片和文字垂直居中 */
+}
+.media-left {
+  margin-right: 15px; /* 圖片與文字間距 */
+}
+
+.image.is-48x48 img {
+  width: 48px;
+  height: 48px;
+  object-fit: cover; /* 確保圖片適應容器 */
 }
 
 /* 走失寵物列表與最新報料動態間距 */

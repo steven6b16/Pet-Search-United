@@ -36,8 +36,9 @@ function FoundPetList() {
     axios
       .get('http://localhost:3001/api/found-pets')
       .then((res) => {
-        setPets(res.data);
-        setFilteredPets(res.data);
+        setPets(res.data); // 保留原始數據
+        const groupedData = groupFoundPets(res.data);
+        setFilteredPets(groupedData);
         setLoading(false);
       })
       .catch((err) => {
@@ -49,7 +50,8 @@ function FoundPetList() {
 
   const applyFilters = () => {
     let result = [...pets];
-
+  
+    // 篩選邏輯（略，保持現有）
     if (filters.dateRangeStart || filters.dateRangeEnd) {
       result = result.filter((pet) => {
         const foundDate = new Date(pet.found_date);
@@ -83,9 +85,40 @@ function FoundPetList() {
       result = result.filter((pet) => pet.color.toLowerCase().includes(filters.color.toLowerCase()));
     }
 
-    setFilteredPets(result);
-  };
+    setFilteredPets(groupFoundPets(result));
+};
 
+  const groupFoundPets = (pets) => {
+    const grouped = {};
+    const single = [];
+  
+    pets.forEach((pet) => {
+      if (pet.groupId) {
+        if (!grouped[pet.groupId]) {
+          grouped[pet.groupId] = { pets: [], representative: pet };
+        }
+        grouped[pet.groupId].pets.push(pet);
+        // 更新代表記錄為最新嘅 found_date
+        if (new Date(pet.found_date) > new Date(grouped[pet.groupId].representative.found_date)) {
+          grouped[pet.groupId].representative = pet;
+        }
+      } else {
+        single.push(pet);
+      }
+    });
+  
+    // 將分組記錄轉為含代表性案例嘅數據
+    return [
+      ...Object.values(grouped).map((group) => ({
+        type: 'grouped',
+        groupId: group.representative.groupId,
+        representative: group.representative,
+        count: group.pets.length,
+      })),
+      ...single.map((pet) => ({ type: 'single', ...pet })),
+    ];
+  };
+  
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
@@ -338,62 +371,89 @@ function FoundPetList() {
 
         {/* Grid 模式顯示 */}
         <div className="columns is-multiline">
-          {filteredPets.length > 0 ? (
-            filteredPets.map((pet) => (
-              <div key={pet.foundId} className="column is-4">
-                <div className="card">
-                  <div className="card-image">
-                    <figure className="image is-4by3">
-                      {pet.photos ? (
+        {filteredPets.length > 0 ? (
+          filteredPets.map((item) => (
+            <div key={item.type === 'grouped' ? item.groupId : item.foundId} className="column is-4">
+              <div className={`${item.type === 'grouped' ? 'grouped-card' : ''}`}>
+              <div className="card">
+                <div className="card-image">
+                  <figure className="image is-4by3">
+                    {item.type === 'grouped' ? (
+                      item.representative.photos ? (
                         <img
-                          src={`http://localhost:3001/${pet.photos.split(',')[0].replace(/\\/g, '/')}`}
+                          src={`http://localhost:3001/${item.representative.photos.split(',')[0].replace(/\\/g, '/')}`}
+                          alt="代表性照片"
+                        />
+                      ) : (
+                        <div className="no-image has-background-light has-text-centered">無照片</div>
+                      )
+                    ) : (
+                      item.photos ? (
+                        <img
+                          src={`http://localhost:3001/${item.photos.split(',')[0].replace(/\\/g, '/')}`}
                           alt="發現寵物照片"
                         />
                       ) : (
                         <div className="no-image has-background-light has-text-centered">無照片</div>
-                      )}
-                    </figure>
-                  </div>
-                  <div className="card-content">
-                    <p className="title is-5">
-                      <span
-                          dangerouslySetInnerHTML={{ __html: getBreedLabelcn(pet.petType, pet.breed) }}
-                        />
+                      )
+                    )}
+                  </figure>
+                </div>
+                <div className="card-content">
+                  {item.type === 'grouped' && (
+                    <span className="grouped-tag tag is-info is-light">發現 <b>{item.count}</b> 次</span>
+                  )}
+                  <p className="title is-5">
+                    <span
+                      dangerouslySetInnerHTML={{
+                        __html: getBreedLabelcn(
+                          item.type === 'grouped' ? item.representative.petType : item.petType,
+                          item.type === 'grouped' ? item.representative.breed : item.breed
+                        ),
+                      }}
+                    />
+                  </p>
+                  <div className="content">
+                    <p>
+                      <strong className="tag is-primary is-light">種類 / 性別:</strong>{' '}
+                      {(item.type === 'grouped' ? item.representative.petType : item.petType) === 'cat'
+                        ? '貓'
+                        : (item.type === 'grouped' ? item.representative.petType : item.petType) === 'dog'
+                        ? '狗'
+                        : '未知'}{' '}
+                      /{' '}
+                      {(item.type === 'grouped' ? item.representative.gender : item.gender) === 'male'
+                        ? '公'
+                        : (item.type === 'grouped' ? item.representative.gender : item.gender) === 'female'
+                        ? '母'
+                        : '未知'}
                     </p>
-                    <div className="content">
-                      <p>
-                        <strong className="tag is-primary is-light">種類 / 性別:</strong>{' '}
-                        {pet.petType === 'cat' ? '貓' : pet.petType === 'dog' ? '狗' : '未知'} /{' '}
-                        {pet.gender === 'male' ? '公' : pet.gender === 'female' ? '母' : '未知'}
-                      </p>
-                      <p>
-                        <strong className="tag is-primary is-light">毛色:</strong> {pet.color || '未知'}
-                      </p>
-                      <p>
-                        <strong className="tag is-primary is-light">發現日期:</strong> {pet.found_date}
-                      </p>
-                      <p>
-                        <strong className="tag is-primary is-light">發現地點:</strong>{' '}
-                        {pet.displayLocation || '未知'}
-                      </p>
-                      <p>
-                        <strong className="tag is-primary is-light">報料人士:</strong>{' '}
-                        {pet.reportername || '匿名'}
-                      </p>
-                    </div>
-                    <Link to={`/pet/${pet.foundId}`} className="button is-primary">
-                      查看詳情
-                    </Link>
+                    <p>
+                      <strong className="tag is-primary is-light">發現日期:</strong>{' '}
+                      {item.type === 'grouped' ? item.representative.found_date : item.found_date}
+                    </p>
+                    <p>
+                      <strong className="tag is-primary is-light">發現地點:</strong>{' '}
+                      {item.type === 'grouped' ? item.representative.displayLocation : item.displayLocation || '未知'}
+                    </p>
                   </div>
+                  <Link
+                    to={`/pet/${item.type === 'grouped' ? item.representative.foundId : item.foundId}`}
+                    className="button is-primary"
+                  >
+                    查看詳情
+                  </Link>
                 </div>
               </div>
-            ))
-          ) : (
-            <div className="column">
-              <p className="has-text-centered">無符合條件的發現寵物</p>
+              </div>
             </div>
-          )}
-        </div>
+          ))
+        ) : (
+          <div className="column">
+            <p className="has-text-centered">無符合條件的發現寵物</p>
+          </div>
+        )}
+      </div>
       </div>
     </section>
   );

@@ -315,7 +315,7 @@
 
 /* 通用樣式 */
 .field {
-  margin-bottom: 0.5rem;
+  margin-bottom: 1.5rem;
 }
 
 .label {
@@ -340,8 +340,8 @@
   box-sizing: border-box;
 }
 
-.report-found .control .input, .report-found .control .select select {
-  /*height: 48px;*/
+.control .input, .control .select select {
+  height: 48px;
 }
 
 .input:focus,
@@ -517,4 +517,8 @@
 
 .custom-react-select__single-value {
   color: #333 !important;
+}
+
+.control .select select {
+  padding: 12px 35px 12px 12px !important;
 }

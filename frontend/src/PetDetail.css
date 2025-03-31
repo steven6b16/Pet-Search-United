@@ -1,9 +1,8 @@
 /* PetDetail.css */
 .pet-detail-section {
   padding: 40px 20px;
-  background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%); /* One Degree 漸變背景 */
   min-height: 100vh;
-  font-family: 'Arial', sans-serif; /* 類似 One Degree 的字體 */
+  font-family: 'Arial', sans-serif; 
 }
 
 .container {
@@ -13,11 +12,11 @@
 
 .title {
   font-size: 2.5rem;
-  color: #00c4cc; /* One Degree 主色調 */
+  color: #00c4cc; 
   margin-bottom: 30px;
   font-weight: 700;
   text-align: center;
-  text-transform: uppercase; /* 類似 One Degree 的標題風格 */
+  text-transform: uppercase;
   letter-spacing: 1px;
 }
 
@@ -71,6 +70,13 @@
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 0.9rem;
+}
+
+/* 自定義標籤樣式 */
+.custom-label {
+  background: transparent !important; /* 移除默認背景，依靠 HTML 中的樣式 */
+  border: none !important; /* 移除邊框 */
+  text-align: center;
 }
 
 .no-photos-card {
@@ -214,14 +220,15 @@
 }
 
 .timeline-item {
-  border-left: 5px solid #00c4cc;
-  padding-left: 1rem;
-  margin-bottom: 1rem;
+  background: #f9f9f9;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
 }
 
 .timeline-item:hover {
-  border-left: 10px solid #00c4cc;
-  transition: 0.3s;
+  background: #e0e7ff;
+  border-left: 5px solid #00A3E0;
 }
 .timeline-item p {
   margin: 0.5rem 0;
@@ -253,4 +260,35 @@
 .button.is-primary,
 .button.is-success {
   /*margin-top: 0.5rem;*/
+}
+
+.lost-icon {
+  background: #fff3e0;
+  border-radius: 10px;
+  padding: 10px;
+  display: inline-block;
+  margin-bottom: 10px;
+  font-weight: bold;
+  color: #ff9800;
+  text-align: center;
+  width: fit-content;
+  margin: 0 auto;
+}
+.pet-info, .contact-info {
+  padding: 20px 0;
+}
+.info-grid p {
+  font-size: 1rem;
+  color: #666;
+  margin-bottom: 10px;
+}
+.info-grid p strong {
+  color: #0057B7;
+  width: 120px;
+  display: inline-block;
+}
+.contact-links {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
 }

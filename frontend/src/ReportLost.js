@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -8,7 +8,7 @@ import { detailinputs } from './constants/QuickInput';
 import { catBreeds, dogBreeds, petage } from './constants/PetConstants';
 import proj4 from 'proj4';
 import { FaCheckCircle, FaTimesCircle, FaLock, FaPhone, FaPaw } from 'react-icons/fa';
-import Select from 'react-select'; // 引入 react-select
+import Select from 'react-select';
 
 // 使用本地圖標（假設圖標文件在 public 目錄下）
 const defaultIcon = L.icon({
@@ -61,10 +61,9 @@ function LocationMarker({ setLatLng, setLocation }) {
         if (addressInfo) {
           const caddress = cleanAddress(addressInfo.caddress || '');
           const cname = cleanAddress(addressInfo.cname || '');
-          simplifiedAddress = `${district} ${caddress}${cname}`.trim(); // 加入 district
+          simplifiedAddress = `${district} ${caddress}${cname}`.trim();
         }
-      }else
-      {
+      } else {
         simplifiedAddress = reverseSimplifiedAddress;
       }
 
@@ -91,20 +90,13 @@ function LocationMarker({ setLatLng, setLocation }) {
       const fullAddress = data.display_name || '未知地址';
       const addressDetails = data.address;
 
-      // 根據地區選擇適當的 district
       let district = '';
       if (isHongKong(lat, lng)) {
-        // 香港：優先使用 suburb（如 "尖沙咀"）或 city_district（如 "油尖旺區"）addressDetails.suburb || || addressDetails.city 
-        console.log(addressDetails.suburb);
-        console.log(addressDetails.city);
-        console.log(addressDetails.city_district);
         district = addressDetails.city || '';
       } else {
-        // 台灣或其他地區：使用 city 或 county（如 "台北市" 或 "台中市"）
         district = addressDetails.city || addressDetails.county || addressDetails.town || addressDetails.suburb || '';
       }
 
-      // 構建更完整的 simplifiedAddress，包含街道和名稱
       const road = addressDetails.road || '';
       const houseNumber = addressDetails.house_number || '';
       const name = addressDetails.amenity || addressDetails.building || '';
@@ -131,7 +123,7 @@ function LocationMarker({ setLatLng, setLocation }) {
         .then(({ fullAddress: reverseFullAddress, simplifiedAddress: reverseSimplifiedAddress, district }) => {
           if (!isHongKong(lat, lng) || hkCoords.x < 800000 || hkCoords.x > 860000 || hkCoords.y < 800000 || hkCoords.y > 850000) {
             console.log('坐標超出香港範圍或非香港地區：', hkCoords);
-            setLocation(reverseFullAddress, reverseSimplifiedAddress); // 使用 Nominatim 結果
+            setLocation(reverseFullAddress, reverseSimplifiedAddress);
           } else {
             fetchHKLocation(hkCoords.x, hkCoords.y, reverseFullAddress, reverseSimplifiedAddress, district)
               .then(data => console.log('HK API 結果：', data))
@@ -164,7 +156,7 @@ async function reverseGeocode(lat, lng) {
   }
 }
 
-function ReportLost() {
+function ReportLost({ user, token }) {  // 新增 props
   const initialFormData = {
     userId: 0,
     ownername: '',
@@ -198,7 +190,20 @@ function ReportLost() {
   const [photoError, setPhotoError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
-   const [geoError, setGeoError] = useState('');
+  const [geoError, setGeoError] = useState('');
+
+  // 自動填充用戶資料
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        userId: user.userId || 0,
+        ownername: user.name || '',
+        phoneNumber: user.phoneNumber || '',
+        email: user.email || '',
+      }));
+    }
+  }, [user]);
 
   const generateTimeOptions = () => {
     const options = [];
@@ -215,21 +220,20 @@ function ReportLost() {
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
     validateField(name, type === 'checkbox' ? checked : value);
   };
-  // 處理 react-select 的品種選擇
+
   const handleBreedChange = (selectedOption) => {
     const value = selectedOption ? selectedOption.value : '';
     setFormData(prev => ({ ...prev, breed: value }));
     validateField('breed', value);
   };
 
-  // 根據 petType 動態生成品種選項
   const breedOptions = formData.petType
     ? (formData.petType === 'cat' ? catBreeds : dogBreeds).map(breed => ({
         value: breed.value,
         label: breed.label,
       }))
     : [];
-    
+
   const validateField = (name, value) => {
     const newErrors = { ...errors };
     if (name === 'name' && !value) {
@@ -381,16 +385,13 @@ function ReportLost() {
   };
 
   const handleSubmit = async (e) => {
-     
     console.log('提交的數據：', formData);
-    
     e.preventDefault();
     if (!validateForm()) {
       alert('請填寫所有必填字段！');
       return;
     }
 
-    // 提交前確認
     const confirmSubmit = window.confirm(
       `請確認以下信息：\n寵物名稱：${formData.name}\n聯繫電話：${formData.phonePrefix} ${formData.phoneNumber}\n遺失地點：${formData.displayLocation}\n確定提交？`
     );
@@ -400,7 +401,6 @@ function ReportLost() {
     const formDataToSend = new FormData();
     const lostDateTime = `${formData.lostDate} ${formData.lostTime}`;
 
-   
     for (let key in formData) {
       if (key === 'isPublic') {
         formDataToSend.append(key, formData[key] ? 1 : 0);
@@ -416,7 +416,9 @@ function ReportLost() {
     otherPhotos.forEach(photo => formDataToSend.append('otherPhotos', photo));
 
     try {
-      const res = await axios.post('http://localhost:3001/api/report-lost', formDataToSend);
+      const res = await axios.post('http://localhost:3001/api/report-lost', formDataToSend, {
+        headers: { 'Authorization': `Bearer ${token}` },  // 使用 token 認證
+      });
       alert(`報失成功，ID: ${res.data.lostId}`);
       handleReset();
     } catch (err) {
@@ -451,586 +453,579 @@ function ReportLost() {
 
   return (
     <section className="section custom-section">
-        <div className="custom-form">
-          {/* 表單標題與認證徽章 */}
-          <div className="header-section has-text-centered mb-6">
-            <img src="/logo.png" alt="Pet Lost Registry Logo" className="logo mb-4" />
-            <h1 className="title is-2 custom-title">
-              寵物走失緊急報失
-            </h1>
-            <p className="subtitle is-5 has-text-grey">
-              由香港寵物協會認證，您的信息安全有保障
-            </p>
-            <div className="certification-badge mt-3">
-              <FaPaw className="mr-2" /> 官方認證
-            </div>
+      <div className="custom-form">
+        <div className="header-section has-text-centered mb-6">
+          <img src="/logo.png" alt="Pet Lost Registry Logo" className="logo mb-4" />
+          <h1 className="title is-2 custom-title">
+            寵物走失緊急報失
+          </h1>
+          <p className="subtitle is-5 has-text-grey">
+            由香港寵物協會認證，您的信息安全有保障
+          </p>
+          <div className="certification-badge mt-3">
+            <FaPaw className="mr-2" /> 官方認證
           </div>
+        </div>
 
-          <form onSubmit={handleSubmit}>
-            {/* 基本資料 */}
-            <div className="form-card mb-5">
-              <h2 className="subtitle is-4 mb-4">
-                <FaPhone className="mr-2" /> 基本資料
-              </h2>
-              <p className="help is-info mb-4">
-                請提供你的聯繫方式，以便我們及時聯繫你。
-              </p>
-              <div className="columns is-multiline">
-                <div className="column is-6">
-                  <div className="field">
-                    <label className="label">
-                      你的稱呼 <span className="has-text-danger">*</span>
-                    </label>
-                    <div className="control has-icons-right">
-                      <input
-                        className={`input is-fullwidth custom-input ${errors.ownername ? 'is-danger' : formData.ownername ? 'is-success' : ''}`}
-                        type="text"
-                        name="ownername"
-                        value={formData.ownername}
-                        placeholder="如何稱呼你"
-                        onChange={handleChange}
-                        required
-                      />
-                      {errors.ownername ? (
-                        <span className="icon is-small is-right">
-                          <FaTimesCircle className="has-text-danger" />
-                        </span>
-                      ) : formData.ownername ? (
-                        <span className="icon is-small is-right">
-                          <FaCheckCircle className="has-text-success" />
-                        </span>
-                      ) : null}
-                      {errors.ownername && <p className="help is-danger">{errors.ownername}</p>}
-                    </div>
-                  </div>
-                </div>
-                <div className="column is-6">
-                  <div className="field">
-                    <label className="label">
-                      聯絡電話 <span className="has-text-danger">*</span>
-                    </label>
-                    <div className="control">
-                      <div className="columns is-mobile">
-                        <div className="column is-narrow">
-                          <div className="select is-fullwidth custom-select">
-                            <select name="phonePrefix" value={formData.phonePrefix} onChange={handleChange}>
-                              <option value="+852">香港 (+852)</option>
-                              <option value="+886">台灣 (+886)</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div className="column">
-                          <div className="control has-icons-right">
-                            <input
-                              className={`input is-fullwidth custom-input ${errors.phoneNumber ? 'is-danger' : formData.phoneNumber ? 'is-success' : ''}`}
-                              type="tel"
-                              name="phoneNumber"
-                              value={formData.phoneNumber}
-                              placeholder="電話號碼"
-                              onChange={handleChange}
-                              required
-                            />
-                            {errors.phoneNumber ? (
-                              <span className="icon is-small is-right">
-                                <FaTimesCircle className="has-text-danger" />
-                              </span>
-                            ) : formData.phoneNumber ? (
-                              <span className="icon is-small is-right">
-                                <FaCheckCircle className="has-text-success" />
-                              </span>
-                            ) : null}
-                            {errors.phoneNumber && <p className="help is-danger">{errors.phoneNumber}</p>}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="column is-6">
-                  <div className="field">
-                    <label className="label">
-                      聯絡電郵 <span className="has-text-danger">*</span>
-                    </label>
-                    <div className="control has-icons-right">
-                      <input
-                        className={`input is-fullwidth custom-input ${errors.email ? 'is-danger' : formData.email ? 'is-success' : ''}`}
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        placeholder="電郵地址"
-                        onChange={handleChange}
-                        required
-                      />
-                      {errors.email ? (
-                        <span className="icon is-small is-right">
-                          <FaTimesCircle className="has-text-danger" />
-                        </span>
-                      ) : formData.email && /\S+@\S+\.\S+/.test(formData.email) ? (
-                        <span className="icon is-small is-right">
-                          <FaCheckCircle className="has-text-success" />
-                        </span>
-                      ) : null}
-                      {errors.email && <p className="help is-danger">{errors.email}</p>}
-                    </div>
-                  </div>
-                </div>
-                <div className="column is-6">
-                <div className="field is-flex is-align-items-center">
-                    <label className="custom-toggle">
-                      <input
-                        type="checkbox"
-                        name="isPublic"
-                        checked={formData.isPublic}
-                        onChange={handleChange}
-                      />
-                      <span className="toggle-slider"></span>
-                    </label>
-                    <span className="toggle-label">公開你的聯繫資料</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 外觀特徵 */}
-            <div className="form-card mb-5">
-              <h2 className="subtitle is-4 mb-4">
-                <FaPaw className="mr-2" /> 外觀特徵
-              </h2>
-              <p className="help is-info mb-4">
-                提供詳細的寵物特徵，幫助我們更快找到你的寵物。
-              </p>
-              <div className="columns is-multiline">
+        <form onSubmit={handleSubmit}>
+          <div className="form-card mb-5">
+            <h2 className="subtitle is-4 mb-4">
+              <FaPhone className="mr-2" /> 基本資料
+            </h2>
+            <p className="help is-info mb-4">
+              請提供你的聯繫方式，以便我們及時聯繫你。
+            </p>
+            <div className="columns is-multiline">
               <div className="column is-6">
-                  <div className="field">
-                    <label className="label">
-                      寵物名稱 <span className="has-text-danger">*</span>
-                    </label>
-                    <div className="control has-icons-right">
-                      <input
-                        className={`input is-fullwidth custom-input ${errors.name ? 'is-danger' : formData.name ? 'is-success' : ''}`}
-                        type="text"
-                        name="name"
-                        value={formData.name}
-                        placeholder="寵物名稱"
-                        onChange={handleChange}
-                        required
-                      />
-                      {errors.name ? (
-                        <span className="icon is-small is-right">
-                          <FaTimesCircle className="has-text-danger" />
-                        </span>
-                      ) : formData.name ? (
-                        <span className="icon is-small is-right">
-                          <FaCheckCircle className="has-text-success" />
-                        </span>
-                      ) : null}
-                      {errors.name && <p className="help is-danger">{errors.name}</p>}
-                    </div>
-                  </div>
-                </div>
-                <div className="column is-3">
-                  <div className="field">
-                    <label className="label">
-                      寵物種類 <span className="has-text-danger">*</span>
-                    </label>
-                    <div className="control is-flex">
-                      <label className="icon-circle mr-4">
-                        <input
-                          type="radio"
-                          name="petType"
-                          value="cat"
-                          checked={formData.petType === 'cat'}
-                          onChange={handleChange}
-                          style={{ display: 'none' }}
-                        />
-                        <img src="/icon/cat.png" alt="Cat" />
-                      </label>
-                      <label className="icon-circle">
-                        <input
-                          type="radio"
-                          name="petType"
-                          value="dog"
-                          checked={formData.petType === 'dog'}
-                          onChange={handleChange}
-                          style={{ display: 'none' }}
-                        />
-                        <img src="/icon/dog.png" alt="Dog" />
-                      </label>
-                    </div>
-                    {errors.petType && <p className="help is-danger">{errors.petType}</p>}
-                  </div>
-                </div>
-                <div className="column is-3">
-                  <div className="field">
-                    <label className="label">
-                      性別 <span className="has-text-danger">*</span>
-                    </label>
-                    <div className="control is-flex">
-                      <label className="icon-circle mr-4">
-                        <input
-                          type="radio"
-                          name="gender"
-                          value="female"
-                          checked={formData.gender === 'female'}
-                          onChange={handleChange}
-                          style={{ display: 'none' }}
-                        />
-                        <img src="/icon/female.png" alt="Female" />
-                      </label>
-                      <label className="icon-circle">
-                        <input
-                          type="radio"
-                          name="gender"
-                          value="male"
-                          checked={formData.gender === 'male'}
-                          onChange={handleChange}
-                          style={{ display: 'none' }}
-                        />
-                        <img src="/icon/male.png" alt="Male" />
-                      </label>
-                    </div>
-                    {errors.gender && <p className="help is-danger">{errors.gender}</p>}
-                  </div>
-                </div>
-                <div className="column is-6">
-                  <div className="field">
-                    <label className="label">
-                      品種 <span className="has-text-danger">*</span>
-                    </label>
-                    <div className="control">
-                      <Select
-                        options={breedOptions}
-                        onChange={handleBreedChange}
-                        value={breedOptions.find(option => option.value === formData.breed) || null}
-                        placeholder="選擇或輸入品種"
-                        isSearchable={true}
-                        isDisabled={!formData.petType}
-                        classNamePrefix="custom-react-select"
-                        noOptionsMessage={() => "無匹配品種"}
-                      />
-                    </div>
-                    {errors.breed && <p className="help is-danger">{errors.breed}</p>}
-                  </div>
-                </div>
-                <div className="column is-6">
-                  <div className="field">
-                    <label className="label">年齡</label>
-                    <div className="control">
-                      <div className="select is-fullwidth custom-select">
-                        <select name="age" value={formData.age} onChange={handleChange}>
-                          <option value="">選擇年齡</option>
-                          {petage.map(option => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="column is-6">
-                  <div className="field">
-                    <label className="label">
-                      顏色 <span className="has-text-danger">*</span>
-                    </label>
-                    <div className="control has-icons-right">
-                      <input
-                        className={`input is-fullwidth custom-input ${errors.color ? 'is-danger' : formData.color ? 'is-success' : ''}`}
-                        type="text"
-                        name="color"
-                        value={formData.color}
-                        placeholder="顏色"
-                        onChange={handleChange}
-                        required
-                      />
-                      {errors.color ? (
-                        <span className="icon is-small is-right">
-                          <FaTimesCircle className="has-text-danger" />
-                        </span>
-                      ) : formData.color ? (
-                        <span className="icon is-small is-right">
-                          <FaCheckCircle className="has-text-success" />
-                        </span>
-                      ) : null}
-                      {errors.color && <p className="help is-danger">{errors.color}</p>}
-                    </div>
-                  </div>
-                </div>
-                <div className="column is-6">
-                  <div className="field">
-                    <label className="label">晶片編號</label>
-                    <div className="control">
-                      <input
-                        className="input is-fullwidth custom-input"
-                        type="text"
-                        name="chipNumber"
-                        value={formData.chipNumber}
-                        placeholder="晶片編號（可選）"
-                        onChange={handleChange}
-                      />
-                    </div>
+                <div className="field">
+                  <label className="label">
+                    你的稱呼 <span className="has-text-danger">*</span>
+                  </label>
+                  <div className="control has-icons-right">
+                    <input
+                      className={`input is-fullwidth custom-input ${errors.ownername ? 'is-danger' : formData.ownername ? 'is-success' : ''}`}
+                      type="text"
+                      name="ownername"
+                      value={formData.ownername}
+                      placeholder="如何稱呼你"
+                      onChange={handleChange}
+                      required
+                    />
+                    {errors.ownername ? (
+                      <span className="icon is-small is-right">
+                        <FaTimesCircle className="has-text-danger" />
+                      </span>
+                    ) : formData.ownername ? (
+                      <span className="icon is-small is-right">
+                        <FaCheckCircle className="has-text-success" />
+                      </span>
+                    ) : null}
+                    {errors.ownername && <p className="help is-danger">{errors.ownername}</p>}
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* 走失詳情 */}
-            <div className="form-card mb-5">
-              <h2 className="subtitle is-4 mb-4">
-                <FaPaw className="mr-2" /> 走失詳情
-              </h2>
-              <p className="help is-info mb-4">
-                提供走失的詳細信息，幫助我們更快找到你的寵物。
-              </p>
-              <div className="columns is-multiline">
-                <div className="column is-6">
-                  <div className="field">
-                    <label className="label">
-                      遺失時間 <span className="has-text-danger">*</span>
-                    </label>
-                    <div className="control">
-                      <div className="columns is-mobile">
-                        <div className="column">
+              <div className="column is-6">
+                <div className="field">
+                  <label className="label">
+                    聯絡電話 <span className="has-text-danger">*</span>
+                  </label>
+                  <div className="control">
+                    <div className="columns is-mobile">
+                      <div className="column is-narrow">
+                        <div className="select is-fullwidth custom-select">
+                          <select name="phonePrefix" value={formData.phonePrefix} onChange={handleChange}>
+                            <option value="+852">香港 (+852)</option>
+                            <option value="+886">台灣 (+886)</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="column">
+                        <div className="control has-icons-right">
                           <input
-                            className={`input is-fullwidth custom-input ${errors.lostDate ? 'is-danger' : formData.lostDate ? 'is-success' : ''}`}
-                            type="date"
-                            name="lostDate"
-                            value={formData.lostDate}
+                            className={`input is-fullwidth custom-input ${errors.phoneNumber ? 'is-danger' : formData.phoneNumber ? 'is-success' : ''}`}
+                            type="tel"
+                            name="phoneNumber"
+                            value={formData.phoneNumber}
+                            placeholder="電話號碼"
                             onChange={handleChange}
                             required
                           />
-                          {errors.lostDate && <p className="help is-danger">{errors.lostDate}</p>}
-                        </div>
-                        <div className="column is-narrow">
-                          <div className="select is-fullwidth custom-select">
-                            <select
-                              name="lostTime"
-                              value={formData.lostTime}
-                              onChange={handleChange}
-                              required
-                            >
-                              <option value="">選擇時間</option>
-                              {generateTimeOptions().map((time) => (
-                                <option key={time} value={time}>{time}</option>
-                              ))}
-                            </select>
-                          </div>
-                          {errors.lostTime && <p className="help is-danger">{errors.lostTime}</p>}
+                          {errors.phoneNumber ? (
+                            <span className="icon is-small is-right">
+                              <FaTimesCircle className="has-text-danger" />
+                            </span>
+                          ) : formData.phoneNumber ? (
+                            <span className="icon is-small is-right">
+                              <FaCheckCircle className="has-text-success" />
+                            </span>
+                          ) : null}
+                          {errors.phoneNumber && <p className="help is-danger">{errors.phoneNumber}</p>}
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
-                <div className="column is-12">
-                  <div className="field">
-                    <label className="label">
-                      遺失地點 <span className="has-text-danger">*</span>
-                    </label>
-                    <div className="control">
-                      <button
-                        type="button"
-                        className="button is-light custom-auto-locate mb-3"
-                        onClick={handleAutoLocate}
-                      >
-                        自動定位
-                      </button>
-                      <div className="map-container">
-                        <MapContainer center={[22.3193, 114.1694]} zoom={11} style={{ height: '500px', width: '100%' }}>
-                           <TileLayer
-                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                             attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                           />
-                           <LocationMarker setLatLng={handleMapUpdate} setLocation={handleSetLocation} />
-                         </MapContainer>
-                      </div>
-                      <p className="help mt-2">地點: {formData.displayLocation || '未選擇'}</p>
-                      {errors.location && <p className="help is-danger">{errors.location}</p>}
-                    </div>
+              </div>
+              <div className="column is-6">
+                <div className="field">
+                  <label className="label">
+                    聯絡電郵 <span className="has-text-danger">*</span>
+                  </label>
+                  <div className="control has-icons-right">
+                    <input
+                      className={`input is-fullwidth custom-input ${errors.email ? 'is-danger' : formData.email ? 'is-success' : ''}`}
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      placeholder="電郵地址"
+                      onChange={handleChange}
+                      required
+                    />
+                    {errors.email ? (
+                      <span className="icon is-small is-right">
+                        <FaTimesCircle className="has-text-danger" />
+                      </span>
+                    ) : formData.email && /\S+@\S+\.\S+/.test(formData.email) ? (
+                      <span className="icon is-small is-right">
+                        <FaCheckCircle className="has-text-success" />
+                      </span>
+                    ) : null}
+                    {errors.email && <p className="help is-danger">{errors.email}</p>}
                   </div>
                 </div>
-                <div className="column is-12">
-                  <div className="field">
-                    <label className="label">其他詳情</label>
-                    <p className="help is-info mb-3">
-                      建議描述寵物特徵（如毛色、項圈、體型）、走失情況（如具體時間、地點），以提升匹配機會。
-                    </p>
-                    <div className="control">
-                      <textarea
-                        className="textarea is-fullwidth custom-textarea"
-                        name="details"
-                        value={formData.details}
+              </div>
+              <div className="column is-6">
+                <div className="field is-flex is-align-items-center">
+                  <label className="custom-toggle">
+                    <input
+                      type="checkbox"
+                      name="isPublic"
+                      checked={formData.isPublic}
+                      onChange={handleChange}
+                    />
+                    <span className="toggle-slider"></span>
+                  </label>
+                  <span className="toggle-label">公開你的聯繫資料</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="form-card mb-5">
+            <h2 className="subtitle is-4 mb-4">
+              <FaPaw className="mr-2" /> 外觀特徵
+            </h2>
+            <p className="help is-info mb-4">
+              提供詳細的寵物特徵，幫助我們更快找到你的寵物。
+            </p>
+            <div className="columns is-multiline">
+              <div className="column is-6">
+                <div className="field">
+                  <label className="label">
+                    寵物名稱 <span className="has-text-danger">*</span>
+                  </label>
+                  <div className="control has-icons-right">
+                    <input
+                      className={`input is-fullwidth custom-input ${errors.name ? 'is-danger' : formData.name ? 'is-success' : ''}`}
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      placeholder="寵物名稱"
+                      onChange={handleChange}
+                      required
+                    />
+                    {errors.name ? (
+                      <span className="icon is-small is-right">
+                        <FaTimesCircle className="has-text-danger" />
+                      </span>
+                    ) : formData.name ? (
+                      <span className="icon is-small is-right">
+                        <FaCheckCircle className="has-text-success" />
+                      </span>
+                    ) : null}
+                    {errors.name && <p className="help is-danger">{errors.name}</p>}
+                  </div>
+                </div>
+              </div>
+              <div className="column is-3">
+                <div className="field">
+                  <label className="label">
+                    寵物種類 <span className="has-text-danger">*</span>
+                  </label>
+                  <div className="control is-flex">
+                    <label className="icon-circle mr-4">
+                      <input
+                        type="radio"
+                        name="petType"
+                        value="cat"
+                        checked={formData.petType === 'cat'}
                         onChange={handleChange}
-                        placeholder="請輸入寵物的描述或走失情況"
-                        maxLength={200}
+                        style={{ display: 'none' }}
                       />
-                      <p className="help mt-2">
-                        字數: {formData.details.length}/200
-                      </p>
+                      <img src="/icon/cat.png" alt="Cat" />
+                    </label>
+                    <label className="icon-circle">
+                      <input
+                        type="radio"
+                        name="petType"
+                        value="dog"
+                        checked={formData.petType === 'dog'}
+                        onChange={handleChange}
+                        style={{ display: 'none' }}
+                      />
+                      <img src="/icon/dog.png" alt="Dog" />
+                    </label>
+                  </div>
+                  {errors.petType && <p className="help is-danger">{errors.petType}</p>}
+                </div>
+              </div>
+              <div className="column is-3">
+                <div className="field">
+                  <label className="label">
+                    性別 <span className="has-text-danger">*</span>
+                  </label>
+                  <div className="control is-flex">
+                    <label className="icon-circle mr-4">
+                      <input
+                        type="radio"
+                        name="gender"
+                        value="female"
+                        checked={formData.gender === 'female'}
+                        onChange={handleChange}
+                        style={{ display: 'none' }}
+                      />
+                      <img src="/icon/female.png" alt="Female" />
+                    </label>
+                    <label className="icon-circle">
+                      <input
+                        type="radio"
+                        name="gender"
+                        value="male"
+                        checked={formData.gender === 'male'}
+                        onChange={handleChange}
+                        style={{ display: 'none' }}
+                      />
+                      <img src="/icon/male.png" alt="Male" />
+                    </label>
+                  </div>
+                  {errors.gender && <p className="help is-danger">{errors.gender}</p>}
+                </div>
+              </div>
+              <div className="column is-6">
+                <div className="field">
+                  <label className="label">
+                    品種 <span className="has-text-danger">*</span>
+                  </label>
+                  <div className="control">
+                    <Select
+                      options={breedOptions}
+                      onChange={handleBreedChange}
+                      value={breedOptions.find(option => option.value === formData.breed) || null}
+                      placeholder="選擇或輸入品種"
+                      isSearchable={true}
+                      isDisabled={!formData.petType}
+                      classNamePrefix="custom-react-select"
+                      noOptionsMessage={() => "無匹配品種"}
+                    />
+                  </div>
+                  {errors.breed && <p className="help is-danger">{errors.breed}</p>}
+                </div>
+              </div>
+              <div className="column is-6">
+                <div className="field">
+                  <label className="label">年齡</label>
+                  <div className="control">
+                    <div className="select is-fullwidth custom-select">
+                      <select name="age" value={formData.age} onChange={handleChange}>
+                        <option value="">選擇年齡</option>
+                        {petage.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    <div className="mt-4">
-                      <p className="is-size-6 mb-2 has-text-weight-medium">特徵</p>
-                      <div className="buttons">
-                        {detailinputs
-                          .filter(item => item.category === '特徵')
-                          .map((item, index) => (
-                            <button
-                              key={index}
-                              type="button"
-                              className="button is-small custom-quick-button mr-2 mb-2"
-                              onClick={() => handleQuickInput(item.text)}
-                            >
-                              {item.text}
-                            </button>
-                          ))}
+                  </div>
+                </div>
+              </div>
+              <div className="column is-6">
+                <div className="field">
+                  <label className="label">
+                    顏色 <span className="has-text-danger">*</span>
+                  </label>
+                  <div className="control has-icons-right">
+                    <input
+                      className={`input is-fullwidth custom-input ${errors.color ? 'is-danger' : formData.color ? 'is-success' : ''}`}
+                      type="text"
+                      name="color"
+                      value={formData.color}
+                      placeholder="顏色"
+                      onChange={handleChange}
+                      required
+                    />
+                    {errors.color ? (
+                      <span className="icon is-small is-right">
+                        <FaTimesCircle className="has-text-danger" />
+                      </span>
+                    ) : formData.color ? (
+                      <span className="icon is-small is-right">
+                        <FaCheckCircle className="has-text-success" />
+                      </span>
+                    ) : null}
+                    {errors.color && <p className="help is-danger">{errors.color}</p>}
+                  </div>
+                </div>
+              </div>
+              <div className="column is-6">
+                <div className="field">
+                  <label className="label">晶片編號</label>
+                  <div className="control">
+                    <input
+                      className="input is-fullwidth custom-input"
+                      type="text"
+                      name="chipNumber"
+                      value={formData.chipNumber}
+                      placeholder="晶片編號（可選）"
+                      onChange={handleChange}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="form-card mb-5">
+            <h2 className="subtitle is-4 mb-4">
+              <FaPaw className="mr-2" /> 走失詳情
+            </h2>
+            <p className="help is-info mb-4">
+              提供走失的詳細信息，幫助我們更快找到你的寵物。
+            </p>
+            <div className="columns is-multiline">
+              <div className="column is-6">
+                <div className="field">
+                  <label className="label">
+                    遺失時間 <span className="has-text-danger">*</span>
+                  </label>
+                  <div className="control">
+                    <div className="columns is-mobile">
+                      <div className="column">
+                        <input
+                          className={`input is-fullwidth custom-input ${errors.lostDate ? 'is-danger' : formData.lostDate ? 'is-success' : ''}`}
+                          type="date"
+                          name="lostDate"
+                          value={formData.lostDate}
+                          onChange={handleChange}
+                          required
+                        />
+                        {errors.lostDate && <p className="help is-danger">{errors.lostDate}</p>}
                       </div>
-                      <p className="is-size-6 mb-2 mt-3 has-text-weight-medium">情況</p>
-                      <div className="buttons">
-                        {detailinputs
-                          .filter(item => item.category === '情況')
-                          .map((item, index) => (
-                            <button
-                              key={index}
-                              type="button"
-                              className="button is-small custom-quick-button mr-2 mb-2"
-                              onClick={() => handleQuickInput(item.text)}
-                            >
-                              {item.text}
-                            </button>
-                          ))}
+                      <div className="column is-narrow">
+                        <div className="select is-fullwidth custom-select">
+                          <select
+                            name="lostTime"
+                            value={formData.lostTime}
+                            onChange={handleChange}
+                            required
+                          >
+                            <option value="">選擇時間</option>
+                            {generateTimeOptions().map((time) => (
+                              <option key={time} value={time}>{time}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {errors.lostTime && <p className="help is-danger">{errors.lostTime}</p>}
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* 相片上傳 */}
-            <div className="form-card mb-5">
-              <h2 className="subtitle is-4 mb-4">
-                <FaPaw className="mr-2" /> 上傳相片
-              </h2>
-              <p className="help is-info mb-4">
-                上傳寵物相片，幫助我們更準確地識別你的寵物。
-              </p>
-              <div className="columns is-multiline">
-                <div className="column is-6">
-                  <div className="field">
-                    <label className="label">寵物正面相（1 張，建議上傳）</label>
-                    <div className="control">
-                      <div className="file has-name is-fullwidth custom-file-upload">
-                        <label className="file-label">
-                          <input
-                            className="file-input"
-                            type="file"
-                            name="frontPhoto"
-                            accept="image/*"
-                            onChange={handleFrontPhotoChange}
-                          />
-                          <span className="file-cta">
-                            <span className="file-label">選擇檔案</span>
-                          </span>
-                          <span className="file-name">
-                            {frontPhoto ? frontPhoto.name : '未選擇檔案'}
-                          </span>
-                        </label>
-                      </div>
+              <div className="column is-12">
+                <div className="field">
+                  <label className="label">
+                    遺失地點 <span className="has-text-danger">*</span>
+                  </label>
+                  <div className="control">
+                    <button
+                      type="button"
+                      className="button is-light custom-auto-locate mb-3"
+                      onClick={handleAutoLocate}
+                    >
+                      自動定位
+                    </button>
+                    <div className="map-container">
+                      <MapContainer center={[22.3193, 114.1694]} zoom={11} style={{ height: '500px', width: '100%' }}>
+                        <TileLayer
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                          attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        />
+                        <LocationMarker setLatLng={handleMapUpdate} setLocation={handleSetLocation} />
+                      </MapContainer>
                     </div>
+                    <p className="help mt-2">地點: {formData.displayLocation || '未選擇'}</p>
+                    {errors.location && <p className="help is-danger">{errors.location}</p>}
                   </div>
                 </div>
-                <div className="column is-6">
-                  <div className="field">
-                    <label className="label">寵物側面相（1 張，建議上傳）</label>
-                    <div className="control">
-                      <div className="file has-name is-fullwidth custom-file-upload">
-                        <label className="file-label">
-                          <input
-                            className="file-input"
-                            type="file"
-                            name="sidePhoto"
-                            accept="image/*"
-                            onChange={handleSidePhotoChange}
-                          />
-                          <span className="file-cta">
-                            <span className="file-label">選擇檔案</span>
-                          </span>
-                          <span className="file-name">
-                            {sidePhoto ? sidePhoto.name : '未選擇檔案'}
-                          </span>
-                        </label>
-                      </div>
-                    </div>
+              </div>
+              <div className="column is-12">
+                <div className="field">
+                  <label className="label">其他詳情</label>
+                  <p className="help is-info mb-3">
+                    建議描述寵物特徵（如毛色、項圈、體型）、走失情況（如具體時間、地點），以提升匹配機會。
+                  </p>
+                  <div className="control">
+                    <textarea
+                      className="textarea is-fullwidth custom-textarea"
+                      name="details"
+                      value={formData.details}
+                      onChange={handleChange}
+                      placeholder="請輸入寵物的描述或走失情況"
+                      maxLength={200}
+                    />
+                    <p className="help mt-2">
+                      字數: {formData.details.length}/200
+                    </p>
                   </div>
-                </div>
-                <div className="column is-12">
-                  <div className="field">
-                    <label className="label">其他相片（最多 5 張，可選）</label>
-                    <div className="control">
-                      <div className="file has-name is-fullwidth custom-file-upload">
-                        <label className="file-label">
-                          <input
-                            className="file-input"
-                            type="file"
-                            name="otherPhotos"
-                            multiple
-                            accept="image/*"
-                            onChange={handleOtherPhotosChange}
-                          />
-                          <span className="file-cta">
-                            <span className="file-label">選擇檔案</span>
-                          </span>
-                          <span className="file-name">
-                            {otherPhotos.length > 0 ? `${otherPhotos.length} 張已選擇` : '未選擇檔案'}
-                          </span>
-                        </label>
-                      </div>
-                      {photoError && <p className="help is-danger mt-2">{photoError}</p>}
+                  <div className="mt-4">
+                    <p className="is-size-6 mb-2 has-text-weight-medium">特徵</p>
+                    <div className="buttons">
+                      {detailinputs
+                        .filter(item => item.category === '特徵')
+                        .map((item, index) => (
+                          <button
+                            key={index}
+                            type="button"
+                            className="button is-small custom-quick-button mr-2 mb-2"
+                            onClick={() => handleQuickInput(item.text)}
+                          >
+                            {item.text}
+                          </button>
+                        ))}
+                    </div>
+                    <p className="is-size-6 mb-2 mt-3 has-text-weight-medium">情況</p>
+                    <div className="buttons">
+                      {detailinputs
+                        .filter(item => item.category === '情況')
+                        .map((item, index) => (
+                          <button
+                            key={index}
+                            type="button"
+                            className="button is-small custom-quick-button mr-2 mb-2"
+                            onClick={() => handleQuickInput(item.text)}
+                          >
+                            {item.text}
+                          </button>
+                        ))}
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
 
-            <input type="hidden" name="region" value={formData.region} />
-            <input type="hidden" name="location" value={formData.location} />
-            <input type="hidden" name="fullAddress" value={formData.fullAddress} />
-
-            {/* 隱私聲明 */}
-            <div className="privacy-notice has-text-centered mb-5">
-              <p className="is-size-6">
-                <FaLock className="mr-2" /> 我們重視你的隱私，所有信息將受到嚴格保護。
-              </p>
-            </div>
-
-            {/* 固定底部欄 */}
-            <div className="custom-footer">
-              <div className="buttons is-centered">
-                <button
-                  className="button is-light custom-back-button"
-                  type="button"
-                  onClick={handleReset}
-                >
-                  重置
-                </button>
-                <button
-                  className="custom-button button is-primary"
-                  type="submit"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <span className="is-flex is-align-items-center">
-                      <span className="loader mr-2"></span> 提交中...
-                    </span>
-                  ) : (
-                    <span className="is-flex is-align-items-center">
-                      提交報失 <FaLock className="ml-2" />
-                    </span>
-                  )}
-                </button>
+          <div className="form-card mb-5">
+            <h2 className="subtitle is-4 mb-4">
+              <FaPaw className="mr-2" /> 上傳相片
+            </h2>
+            <p className="help is-info mb-4">
+              上傳寵物相片，幫助我們更準確地識別你的寵物。
+            </p>
+            <div className="columns is-multiline">
+              <div className="column is-6">
+                <div className="field">
+                  <label className="label">寵物正面相（1 張，建議上傳）</label>
+                  <div className="control">
+                    <div className="file has-name is-fullwidth custom-file-upload">
+                      <label className="file-label">
+                        <input
+                          className="file-input"
+                          type="file"
+                          name="frontPhoto"
+                          accept="image/*"
+                          onChange={handleFrontPhotoChange}
+                        />
+                        <span className="file-cta">
+                          <span className="file-label">選擇檔案</span>
+                        </span>
+                        <span className="file-name">
+                          {frontPhoto ? frontPhoto.name : '未選擇檔案'}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="column is-6">
+                <div className="field">
+                  <label className="label">寵物側面相（1 張，建議上傳）</label>
+                  <div className="control">
+                    <div className="file has-name is-fullwidth custom-file-upload">
+                      <label className="file-label">
+                        <input
+                          className="file-input"
+                          type="file"
+                          name="sidePhoto"
+                          accept="image/*"
+                          onChange={handleSidePhotoChange}
+                        />
+                        <span className="file-cta">
+                          <span className="file-label">選擇檔案</span>
+                        </span>
+                        <span className="file-name">
+                          {sidePhoto ? sidePhoto.name : '未選擇檔案'}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="column is-12">
+                <div className="field">
+                  <label className="label">其他相片（最多 5 張，可選）</label>
+                  <div className="control">
+                    <div className="file has-name is-fullwidth custom-file-upload">
+                      <label className="file-label">
+                        <input
+                          className="file-input"
+                          type="file"
+                          name="otherPhotos"
+                          multiple
+                          accept="image/*"
+                          onChange={handleOtherPhotosChange}
+                        />
+                        <span className="file-cta">
+                          <span className="file-label">選擇檔案</span>
+                        </span>
+                        <span className="file-name">
+                          {otherPhotos.length > 0 ? `${otherPhotos.length} 張已選擇` : '未選擇檔案'}
+                        </span>
+                      </label>
+                    </div>
+                    {photoError && <p className="help is-danger mt-2">{photoError}</p>}
+                  </div>
+                </div>
               </div>
             </div>
-          </form>
-        </div>
+          </div>
+
+          <input type="hidden" name="region" value={formData.region} />
+          <input type="hidden" name="location" value={formData.location} />
+          <input type="hidden" name="fullAddress" value={formData.fullAddress} />
+
+          <div className="privacy-notice has-text-centered mb-5">
+            <p className="is-size-6">
+              <FaLock className="mr-2" /> 我們重視你的隱私，所有信息將受到嚴格保護。
+            </p>
+          </div>
+
+          <div className="custom-footer">
+            <div className="buttons is-centered">
+              <button
+                className="button is-light custom-back-button"
+                type="button"
+                onClick={handleReset}
+              >
+                重置
+              </button>
+              <button
+                className="custom-button button is-primary"
+                type="submit"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <span className="is-flex is-align-items-center">
+                    <span className="loader mr-2"></span> 提交中...
+                  </span>
+                ) : (
+                  <span className="is-flex is-align-items-center">
+                    提交報失 <FaLock className="ml-2" />
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
     </section>
   );
 }
