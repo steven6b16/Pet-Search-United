@@ -54,15 +54,11 @@ function PetDetail() {
       axios
         .get('http://localhost:3001/api/check-is-user', { headers: { Authorization: `Bearer ${token}` } })
         .then((res) => setUser(res.data))
-        .catch((err) => {
-          console.error('Get user failed:', err);
-          localStorage.removeItem('token');
-        });
+        .catch((err) => console.error('Get user failed:', err));
     }
 
     const fetchPet = async () => {
       setLoading(true);
-      setError(null);
       try {
         let petData = null;
         try {
@@ -76,39 +72,22 @@ function PetDetail() {
             petData = foundResponse.data;
             petData.type = 'found';
           } catch (foundErr) {
-            console.error('Fetch found pet failed:', foundErr);
             throw new Error('無法找到該寵物資料');
           }
         }
 
-        console.log('Pet data:', petData);
         setPet(petData);
         parseCoordinates(petData);
 
-        if (petData.type === 'found' && petData.foundId) {
-          if (petData.groupId) {
-            const related = await axios.get(`http://localhost:3001/api/found-pets?groupId=${petData.groupId}`);
-            const filteredRelated = related.data.filter(
-              (p) => p.foundId !== id && p.groupId === petData.groupId
-            );
-            console.log('Fetched related found pets:', filteredRelated);
-            setRelatedFoundPets(filteredRelated);
-          } else {
-            setRelatedFoundPets([]);
-          }
-
-          const pendingData = await axios.get(`http://localhost:3001/api/pending-found-ids/${petData.foundId}`);
-          console.log('Pending data:', pendingData.data);
-          setPendingGroupId(pendingData.data.groupId);
-          setPendingFoundIds(pendingData.data.pendingFoundIds || []);
-        } else {
-          setRelatedFoundPets([]);
-          setPendingFoundIds([]);
-        }
+        // 獲取匹配信息
+        const matchesResponse = await axios.get('http://localhost:3001/api/matches', {
+          params: { petId: id },
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setMatches(matchesResponse.data.matches || []);
       } catch (err) {
         console.error('Fetch pet failed:', err);
         setError(err.message || '無法獲取寵物資料');
-        setPet(null);
       } finally {
         setLoading(false);
       }
@@ -219,19 +198,27 @@ function PetDetail() {
     }
   };
 
+  // 確認配對
   const handleConfirmMatch = async (matchId) => {
-    const token = localStorage.getItem('token');
+    if (!window.confirm('當確認配對，即表示已尋獲你的寵物，個案將不會再公開，是否確認？')) return;
+
     try {
-      const res = await axios.post(
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
         'http://localhost:3001/api/confirm-pet-match',
         { matchId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      alert(res.data.message);
-      setMatches(matches.map((m) => (m.matchId === matchId ? { ...m, status: 'confirmed' } : m)));
-      setPet({ ...pet, isFound: true });
+      alert(response.data.message);
+      // 刷新匹配列表
+      const matchesResponse = await axios.get('http://localhost:3001/api/matches', {
+        params: { petId: id },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setMatches(matchesResponse.data.matches || []);
     } catch (err) {
-      alert(err.response?.data?.error || '確認失敗');
+      console.error('確認配對失敗:', err);
+      alert(err.response?.data?.error || '確認配對失敗，請稍後再試');
     }
   };
 
@@ -484,36 +471,23 @@ function PetDetail() {
 
         {/* 匹配狀態 */}
         <div className="card">
-          <h2 className="subtitle">匹配狀態</h2>
-          <div className="timeline">
-            {matches.map((match) => (
-              <div key={match.matchId} className="timeline-item">
-                <p><strong>匹配 ID:</strong> {match.matchId}</p>
-                <p><strong>狀態:</strong> {match.status === 'pending' ? '待確認' : match.status === 'confirmed' ? '已確認' : '已拒絕'}</p>
-                <p><strong>走失 ID:</strong> <a href={`/pet/${match.lostId}`}>{match.lostId}</a></p>
-                <p><strong>報料 ID:</strong> <a href={`/pet/${match.foundId}`}>{match.foundId}</a></p>
-                {match.status === 'pending' && user && isLostPet && pet.userId === user.userId && (
-                  <button className="button is-success" onClick={() => handleConfirmMatch(match.matchId)}>確認匹配</button>
-                )}
-              </div>
-            ))}
-          </div>
-          {user && (
-            <div className="field">
-              <label className="label">匹配報失/報料</label>
-              <div className="control">
-                <input
-                  className="input"
-                  type="text"
-                  placeholder={`輸入要匹配的 ${isLostPet ? 'foundId' : 'lostId'}`}
-                  value={linkFoundId}
-                  onChange={(e) => setLinkFoundId(e.target.value)}
-                />
-                <button className="button is-primary mt-2" onClick={handleCreateMatch}>提交匹配</button>
-              </div>
+            <h2 className="subtitle">匹配狀態</h2>
+            <div className="timeline">
+              {matches.map((match) => (
+                <div key={match.matchId} className="timeline-item">
+                  <p><strong>匹配 ID:</strong> {match.matchId}</p>
+                  <p><strong>狀態:</strong> {match.status === 'pending' ? '待確認' : match.status === 'confirmed' ? '已確認' : '已拒絕'}</p>
+                  <p><strong>走失 ID:</strong> <a href={`/pet/${match.lostId}`}>{match.lostId}</a></p>
+                  <p><strong>報料 ID:</strong> <a href={`/pet/${match.foundId}`}>{match.foundId}</a></p>
+                  {match.status === 'pending' && user && pet.type === 'lost' && pet.userId === user.userId && (
+                    <button className="button is-success" onClick={() => handleConfirmMatch(match.matchId)}>
+                      確認配對
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
-          )}
-        </div>
+          </div>
 
         {/* 報料更新 */}
         {pet.type === 'found' && user && (

@@ -9,10 +9,11 @@ import LostPetList from './LostPetList';
 import FoundPetList from './FoundPetList';
 import AdminDashboard from './admin/AdminDashboard';
 import AdminPendingGroups from './admin/AdminPendingGroups';
-import ProtectedRoute from './components/ProtectedRoute';
-import ScrollToTop from './components/ScrollToTop';
+import AdminPendingMatches from './admin/AdminPendingMatches';
 import UserLostReports from './user/UserLostReports';
 import UserFoundReports from './user/UserFoundReports';
+import ProtectedRoute from './components/ProtectedRoute';
+import ScrollToTop from './components/ScrollToTop';
 import { catBreeds, dogBreeds } from './constants/PetConstants';
 import axios from 'axios';
 import * as reactLeaflet from 'react-leaflet';
@@ -225,6 +226,7 @@ function AppContent() {
             <Route path="/found-pet-list" element={<FoundPetList />} />
             <Route path="/admin" element={<ProtectedRoute requireAdmin={true} setIsLoginOpen={setIsLoginOpen}><AdminDashboard /></ProtectedRoute>} />
             <Route path="/admin/pending-groups" element={<AdminPendingGroups />} />
+            <Route path="/admin/pending-matches" element={<ProtectedRoute requireAdmin={true} setIsLoginOpen={setIsLoginOpen}><AdminPendingMatches /></ProtectedRoute>}/>
             <Route
               path="/account"
               element={

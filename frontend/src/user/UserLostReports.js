@@ -5,6 +5,7 @@ import { FaPaw } from 'react-icons/fa';
 
 function UserLostReports({ user, token }) {
   const [lostReports, setLostReports] = useState([]);
+  const [matches, setMatches] = useState([]);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -13,18 +14,37 @@ function UserLostReports({ user, token }) {
       return;
     }
 
-    axios
-      .get('http://localhost:3001/api/user/lost-reports', { 
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      .then((res) => {
-        setLostReports(res.data);
+    const fetchData = async () => {
+      try {
+        const reportsResponse = await axios.get('http://localhost:3001/api/user/lost-reports', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const reports = reportsResponse.data || [];
+        setLostReports(reports);
+        console.log('Lost Reports:', reports);
+
+        const lostIds = reports.map((report) => report.lostId).join(',');
+        console.log('Lost IDs for matches:', lostIds);
+        if (lostIds) {
+          const matchesResponse = await axios.get('http://localhost:3001/api/matches', {
+            params: { petId: lostIds },
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const matchesData = matchesResponse.data.matches || [];
+          setMatches(matchesData);
+          console.log('Matches data:', matchesData);
+        } else {
+          setMatches([]);
+          console.log('No lostIds, matches set to empty');
+        }
         setError(null);
-      })
-      .catch((err) => {
-        console.error('獲取報失記錄失敗:', err);
-        setError(err.response?.data?.error || '無法獲取報失記錄，請稍後再試');
-      });
+      } catch (err) {
+        console.error('獲取數據失敗:', err.response?.data || err);
+        setError(err.response?.data?.error || '無法獲取報失記錄或匹配數據，請稍後再試');
+      }
+    };
+
+    fetchData();
   }, [token]);
 
   const handleDelete = async (lostId) => {
@@ -32,12 +52,35 @@ function UserLostReports({ user, token }) {
     if (window.confirm('確定要刪除此報失記錄嗎？')) {
       try {
         await axios.delete(`http://localhost:3001/api/user/lost-reports/${lostId}`, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         });
-        setLostReports(lostReports.filter(report => report.lostId !== lostId));
+        setLostReports(lostReports.filter((report) => report.lostId !== lostId));
+        setMatches(matches.filter((match) => match.lostId !== lostId));
       } catch (err) {
         setError('刪除失敗: ' + err.response?.data?.error);
       }
+    }
+  };
+
+  const handleConfirmMatch = async (matchId) => {
+    if (!window.confirm('當確認配對，即表示已尋獲你的寵物，個案將不會再公開，是否確認？')) return;
+
+    try {
+      const response = await axios.post(
+        'http://localhost:3001/api/confirm-pet-match',
+        { matchId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert(response.data.message);
+      const lostIds = lostReports.map((report) => report.lostId).join(',');
+      const matchesResponse = await axios.get('http://localhost:3001/api/matches', {
+        params: { petId: lostIds },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setMatches(matchesResponse.data.matches || []);
+    } catch (err) {
+      console.error('確認配對失敗:', err);
+      alert(err.response?.data?.error || '確認配對失敗，請稍後再試');
     }
   };
 
@@ -76,14 +119,31 @@ function UserLostReports({ user, token }) {
                     <Link to={`/pet/${pet.lostId}`} className="button custom-button is-small mr-2">
                       查看詳情
                     </Link>
-                    
-                    <button 
+                    <button
                       onClick={() => handleDelete(pet.lostId)}
                       className="button is-danger is-small"
                     >
                       刪除
                     </button>
                   </div>
+                  {/* 顯示匹配信息 */}
+                  {matches
+                    .filter((match) => String(match.lostId) === String(pet.lostId)) // 確保字符串比較
+                    .map((match) => (
+                      <div key={match.matchId} className="mt-4">
+                        <p><strong>匹配 ID:</strong> {match.matchId}</p>
+                        <p><strong>狀態:</strong> {match.status === 'pending' ? '待確認' : match.status === 'confirmed' ? '已確認' : '已拒絕'}</p>
+                        <p><strong>尋獲 ID:</strong> <Link to={`/pet/${match.foundId}`}>{match.foundId}</Link></p>
+                        {match.status === 'pending' && user && user.userId === pet.userId && (
+                          <button
+                            className="button is-success mt-2"
+                            onClick={() => handleConfirmMatch(match.matchId)}
+                          >
+                            確認配對
+                          </button>
+                        )}
+                      </div>
+                    ))}
                 </div>
               </div>
             </div>

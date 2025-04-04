@@ -120,6 +120,7 @@ db.serialize(() => {
       status TEXT,
       casestatus TEXT DEFAULT 'pending' CHECK (casestatus IN ('pending', 'active', 'rejected')),
       createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      modifiedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       isPublic BOOLEAN DEFAULT 0,
       isFound BOOLEAN DEFAULT 0,
       isDeleted BOOLEAN DEFAULT 0,
@@ -1192,93 +1193,146 @@ app.post('/api/create-pet-match', async (req, res) => {
   }
 });
 
-app.get('/api/matches', async (req, res) => {
-  const { petId } = req.query;
-  if (!petId) {
-    return res.status(400).json({ error: '請提供 petId' });
-  }
 
-  try {
-    const matches = await new Promise((resolve, reject) => {
-      db.all(
-        `
-        SELECT pm.matchId, pm.status, pm.createdAt, lp.name AS lostPetName, fp.reportername AS foundPetName,
-               lp.lostId, fp.foundId
-        FROM pet_matches pm
-        LEFT JOIN lost_pets lp ON pm.lostId = lp.lostId
-        LEFT JOIN found_pets fp ON pm.foundId = fp.foundId
-        WHERE pm.lostId = ? OR pm.foundId = ?
-        `,
-        [petId, petId],
-        (err, rows) => {
-          if (err) reject(err);
-          else resolve(rows);
-        }
-      );
-    });
-
-    res.json({ petId, matches });
-  } catch (err) {
-    console.error('獲取匹配失敗:', err);
-    res.status(500).json({ error: '服務器錯誤' });
-  }
-});
-
-app.post('/api/confirm-pet-match', async (req, res) => {
+app.post('/api/confirm-pet-match', authenticateToken, async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: '請先登入' });
-
   const { matchId } = req.body;
-  if (!matchId) return res.status(400).json({ error: '請提供 matchId' });
+
+  if (!token || !matchId) {
+    return res.status(401).json({ error: '請先登入並提供 matchId' });
+  }
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const userId = decoded.userId;
 
     const match = await new Promise((resolve, reject) => {
-      db.get('SELECT * FROM pet_matches WHERE matchId = ? AND status = "pending"', [matchId], (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
-      });
+      db.get(
+        'SELECT pm.matchId, pm.lostId, pm.foundId, lp.userId AS lostUserId ' +
+        'FROM pet_matches pm ' +
+        'LEFT JOIN lost_pets lp ON pm.lostId = lp.lostId ' +
+        'WHERE pm.matchId = ? AND pm.status = "pending"',
+        [matchId],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
     });
-    if (!match) return res.status(404).json({ error: '匹配不存在或已處理' });
 
-    const lostPet = await new Promise((resolve, reject) => {
-      db.get('SELECT userId FROM lost_pets WHERE lostId = ?', [match.lostId], (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
-      });
+    if (!match) {
+      return res.status(404).json({ error: '配對不存在或已處理' });
+    }
+
+    // 檢查是否為失主或報料人（暫時只檢查失主，後續可擴展到 foundPet.userId）
+    if (match.lostUserId !== userId) {
+      return res.status(403).json({ error: '只有寵物主人可以確認' });
+    }
+
+    if (!window.confirm('當確認配對，即表示已尋獲你的寵物，個案將不會再公開，是否確認？')) {
+      return res.status(400).json({ error: '確認已取消' });
+    }
+
+    await new Promise((resolve, reject) => {
+      db.run(
+        `
+        UPDATE pet_matches 
+        SET status = 'confirmed', 
+            confirmedAt = CURRENT_TIMESTAMP, 
+            confirmedBy = ? 
+        WHERE matchId = ?
+        `,
+        [userId, matchId],
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
     });
-    if (lostPet.userId !== userId) return res.status(403).json({ error: '只有寵物主人可以確認' });
 
-    db.run(
-      `
-      UPDATE pet_matches SET status = "confirmed", confirmedBy = ?, confirmedAt = CURRENT_TIMESTAMP WHERE matchId = ?
-    `,
-      [userId, matchId],
-      (err) => {
-        if (err) return res.status(500).json({ error: '確認失敗' });
-
-        db.run('UPDATE lost_pets SET isFound = 1 WHERE lostId = ?', [match.lostId]);
-        db.run('UPDATE found_pets SET isFound = 1 WHERE foundId = ?', [match.foundId], async (err) => {
-          if (err) return res.status(500).json({ error: '關閉個案失敗' });
-
-          const foundGroup = await new Promise((resolve, reject) => {
-            db.get('SELECT groupId FROM found_pets WHERE foundId = ?', [match.foundId], (err, row) => {
-              if (err) reject(err);
-              else resolve(row);
-            });
-          });
-          if (foundGroup && foundGroup.groupId) {
-            db.run('UPDATE found_pets SET isFound = 1 WHERE groupId = ?', [foundGroup.groupId]);
+    await Promise.all([
+      new Promise((resolve, reject) => {
+        db.run(
+          'UPDATE lost_pets SET isFound = 1, modifiedAt = CURRENT_TIMESTAMP WHERE lostId = ?',
+          [match.lostId],
+          (err) => {
+            if (err) reject(err);
+            else resolve();
           }
+        );
+      }),
+      new Promise((resolve, reject) => {
+        db.run(
+          'UPDATE found_pets SET isFound = 1, modifiedAt = CURRENT_TIMESTAMP WHERE foundId = ?',
+          [match.foundId],
+          (err) => {
+            if (err) reject(err);
+            else resolve();
+          }
+        );
+      }),
+    ]);
 
-          res.json({ message: '匹配已確認，個案已關閉' });
-        });
-      }
-    );
+    res.json({ message: '配對已確認，個案已關閉' });
   } catch (err) {
-    res.status(401).json({ error: '無效嘅 token' });
+    console.error('確認配對失敗:', err);
+    res.status(500).json({ error: '確認配對失敗' });
+  }
+});
+
+// 獲取配對列表（按狀態過濾）
+// 獲取配對列表（按狀態過濾，可選 petId）
+app.get('/api/matches', authenticateToken, async (req, res) => {
+  const { status, petId } = req.query;
+
+  try {
+    const matches = await new Promise((resolve, reject) => {
+      let query = `
+        SELECT 
+          pm.matchId, 
+          pm.lostId, 
+          pm.foundId, 
+          pm.status, 
+          pm.createdAt,
+          lp.name AS lostPetName, 
+          lp.petType AS lostPetType, 
+          lp.breed AS lostBreed, 
+          lp.color AS lostColor, 
+          lp.lost_date AS lostDate, 
+          lp.location AS lostLocation,
+          lp.isFound AS lostIsFound,
+          fp.reportername AS foundReporterName, 
+          fp.petType AS foundPetType, 
+          fp.breed AS foundBreed, 
+          fp.color AS foundColor, 
+          fp.found_date AS foundDate, 
+          fp.found_location AS foundLocation,
+          fp.isFound AS foundIsFound
+        FROM pet_matches pm
+        LEFT JOIN lost_pets lp ON pm.lostId = lp.lostId
+        LEFT JOIN found_pets fp ON pm.foundId = fp.foundId
+      `;
+      const params = [];
+
+      if (petId) {
+        const petIds = petId.split(',').map(id => id.trim()); // 分割並去除空格
+        query += ' WHERE pm.lostId IN (' + petIds.map(() => '?').join(',') + ')';
+        params.push(...petIds);
+      } else if (status) {
+        query += ' WHERE pm.status = ?';
+        params.push(status);
+      }
+
+      db.all(query, params, (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      });
+    });
+
+    res.json({ matches });
+  } catch (err) {
+    console.error('獲取配對失敗:', err);
+    res.status(500).json({ error: '獲取配對失敗' });
   }
 });
 
@@ -1359,6 +1413,197 @@ app.get('/api/admin/pending-groups', isAdmin, async (req, res) => {
   } catch (err) {
     console.error('獲取待確認群組失敗:', err);
     res.status(500).json({ error: '獲取待確認群組失敗' });
+  }
+});
+
+// 獲取所有待確認的配對
+app.get('/api/admin/pending-matches', isAdmin, async (req, res) => {
+  try {
+    const pendingMatches = await new Promise((resolve, reject) => {
+      db.all(
+        `
+        SELECT 
+          pm.matchId, 
+          pm.lostId, 
+          pm.foundId, 
+          pm.createdAt,
+          lp.name AS lostPetName, 
+          lp.petType AS lostPetType, 
+          lp.breed AS lostBreed, 
+          lp.color AS lostColor, 
+          lp.lost_date AS lostDate, 
+          lp.location AS lostLocation,
+          fp.reportername AS foundReporterName, 
+          fp.petType AS foundPetType, 
+          fp.breed AS foundBreed, 
+          fp.color AS foundColor, 
+          fp.found_date AS foundDate, 
+          fp.found_location AS foundLocation
+        FROM pet_matches pm
+        LEFT JOIN lost_pets lp ON pm.lostId = lp.lostId
+        LEFT JOIN found_pets fp ON pm.foundId = fp.foundId
+        WHERE pm.status = 'pending'
+        `,
+        [],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows);
+        }
+      );
+    });
+
+    res.json({ pendingMatches });
+  } catch (err) {
+    console.error('獲取待確認配對失敗:', err);
+    res.status(500).json({ error: '獲取待確認配對失敗' });
+  }
+});
+
+// Admin 確認配對
+app.post('/api/admin/confirm-match', isAdmin, async (req, res) => {
+  const { matchId } = req.body;
+
+  if (!matchId) {
+    return res.status(400).json({ error: '請提供 matchId' });
+  }
+
+  try {
+    const match = await new Promise((resolve, reject) => {
+      db.get(
+        'SELECT * FROM pet_matches WHERE matchId = ? AND status = "pending"',
+        [matchId],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
+
+    if (!match) {
+      return res.status(404).json({ error: '配對不存在或已處理' });
+    }
+
+    await new Promise((resolve, reject) => {
+      db.run(
+        `
+        UPDATE pet_matches 
+        SET status = 'confirmed', 
+            confirmedAt = CURRENT_TIMESTAMP, 
+            confirmedBy = ? 
+        WHERE matchId = ?
+        `,
+        [req.user.userId, matchId],
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    });
+
+    res.json({ message: '配對已確認', matchId });
+  } catch (err) {
+    console.error('確認配對失敗:', err);
+    res.status(500).json({ error: '確認配對失敗' });
+  }
+});
+
+// Admin 確認配對已尋獲 (重要不要DELETE 此COMMENT)
+app.post('/api/admin/confirm-found', isAdmin, async (req, res) => {
+  const { matchId } = req.body;
+
+  if (!matchId) {
+    return res.status(400).json({ error: '請提供 matchId' });
+  }
+
+  try {
+    // 檢查配對是否存在且狀態為 confirmed
+    const match = await new Promise((resolve, reject) => {
+      db.get(
+        'SELECT lostId, foundId FROM pet_matches WHERE matchId = ? AND status = "confirmed"',
+        [matchId],
+        (err, row) => {
+          if (err) {
+            console.error('數據庫查詢錯誤:', err);
+            reject(err);
+          } else {
+            resolve(row);
+          }
+        }
+      );
+    });
+
+    if (!match) {
+      return res.status(404).json({ error: '配對不存在或尚未確認' });
+    }
+
+    if (!match.lostId || !match.foundId) {
+      return res.status(400).json({ error: '配對數據缺失 (lostId 或 foundId 無效)' });
+    }
+
+    // 檢查 lostId 和 foundId 是否存在
+    const [lostExists, foundExists] = await Promise.all([
+      new Promise((resolve, reject) => {
+        db.get(
+          'SELECT COUNT(*) as count FROM lost_pets WHERE lostId = ?',
+          [match.lostId],
+          (err, row) => {
+            if (err) reject(err);
+            else resolve(row.count > 0);
+          }
+        );
+      }),
+      new Promise((resolve, reject) => {
+        db.get(
+          'SELECT COUNT(*) as count FROM found_pets WHERE foundId = ?',
+          [match.foundId],
+          (err, row) => {
+            if (err) reject(err);
+            else resolve(row.count > 0);
+          }
+        );
+      }),
+    ]);
+
+    if (!lostExists || !foundExists) {
+      return res.status(404).json({ error: '配對對應的遺失或尋獲記錄不存在' });
+    }
+
+    // 更新 lost_pets 和 found_pets 的 isFound 狀態
+    await Promise.all([
+      new Promise((resolve, reject) => {
+        db.run(
+          'UPDATE lost_pets SET isFound = 1, modifiedAt = CURRENT_TIMESTAMP WHERE lostId = ?',
+          [match.lostId],
+          (err) => {
+            if (err) {
+              console.error(`更新 lost_pets 失敗 (lostId: ${match.lostId}):`, err);
+              reject(err);
+            } else {
+              resolve();
+            }
+          }
+        );
+      }),
+      new Promise((resolve, reject) => {
+        db.run(
+          'UPDATE found_pets SET isFound = 1, modifiedAt = CURRENT_TIMESTAMP WHERE foundId = ?',
+          [match.foundId],
+          (err) => {
+            if (err) {
+              console.error(`更新 found_pets 失敗 (foundId: ${match.foundId}):`, err);
+              reject(err);
+            } else {
+              resolve();
+            }
+          }
+        );
+      }),
+    ]);
+
+    res.json({ message: '配對已確認為已尋獲', matchId });
+  } catch (err) {
+    console.error('確認已尋獲失敗:', err);
+    res.status(500).json({ error: `確認已尋獲失敗: ${err.message}` });
   }
 });
 
